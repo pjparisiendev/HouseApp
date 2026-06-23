@@ -26,6 +26,8 @@ import {
   bookOutline,
   compassOutline,
   heartOutline,
+  gridOutline,
+  listOutline,
   locationOutline,
   openOutline,
   pencilOutline,
@@ -68,6 +70,7 @@ export function Wishlist() {
   const editable = can('edit_household')
   const [items, setItems] = useState<WishlistItem[]>([])
   const [activeType, setActiveType] = useState<'all' | WishlistType>('all')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [form, setForm] = useState(emptyForm)
@@ -202,6 +205,23 @@ export function Wishlist() {
             ))}
           </div>
 
+          <div className="view-toggle" aria-label="Wish list view">
+            <button
+              className={viewMode === 'grid' ? 'active' : ''}
+              type="button"
+              onClick={() => setViewMode('grid')}
+            >
+              <IonIcon icon={gridOutline} /> Grid
+            </button>
+            <button
+              className={viewMode === 'list' ? 'active' : ''}
+              type="button"
+              onClick={() => setViewMode('list')}
+            >
+              <IonIcon icon={listOutline} /> List
+            </button>
+          </div>
+
           {visibleItems.length === 0 ? (
             <div className="empty-stock">
               <IonIcon icon={heartOutline} />
@@ -211,6 +231,25 @@ export function Wishlist() {
               </IonText>
               {editable && <IonButton onClick={openNewForm}>Add an idea</IonButton>}
             </div>
+          ) : viewMode === 'list' ? (
+            <section className="compact-item-list" aria-label="Wish list items">
+              {visibleItems.map((item) => {
+                const type = wishlistTypes.find(
+                  (candidate) => candidate.value === item.type,
+                )!
+                return (
+                  <button
+                    className="compact-item-row"
+                    key={item.id}
+                    type="button"
+                    onClick={() => editable && openEditForm(item)}
+                  >
+                    <span>{item.title}</span>
+                    <strong>{type.label}</strong>
+                  </button>
+                )
+              })}
+            </section>
           ) : (
             <section className="wishlist-grid" aria-label="Wish list items">
               {visibleItems.map((item) => {

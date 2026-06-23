@@ -10,7 +10,12 @@ class InventoryCategoryController extends Controller
 {
     public function index()
     {
-        return InventoryCategory::query()->orderBy('name')->get();
+        InventoryCategory::query()->firstOrCreate(['name' => 'None']);
+
+        return InventoryCategory::query()
+            ->orderByRaw("CASE WHEN name = 'None' THEN 0 ELSE 1 END")
+            ->orderBy('name')
+            ->get();
     }
 
     public function store(Request $request)

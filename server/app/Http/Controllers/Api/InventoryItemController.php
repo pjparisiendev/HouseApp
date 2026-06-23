@@ -101,7 +101,9 @@ class InventoryItemController extends Controller
             'quantity' => ['required', 'integer', 'min:0'],
             'low_stock_threshold' => ['required', 'integer', 'min:0'],
             'sub_quantity_enabled' => ['sometimes', 'boolean'],
-            'units_per_pack' => [$enabled ? 'required' : 'nullable', 'integer', 'min:2'],
+            'units_per_pack' => $enabled
+                ? ['required', 'integer', 'min:2']
+                : ['nullable', 'integer'],
             'unit_label' => [$enabled ? 'required' : 'nullable', 'string', 'max:30'],
             'pack_label' => [$enabled ? 'required' : 'nullable', 'string', 'max:30'],
             'low_stock_threshold_mode' => [

@@ -22,6 +22,8 @@ import {
   addOutline,
   basketOutline,
   checkmarkOutline,
+  gridOutline,
+  listOutline,
   removeOutline,
   trashOutline,
 } from 'ionicons/icons'
@@ -42,10 +44,12 @@ export function ShoppingList() {
   } = useHousehold()
   const editable = can('edit_household')
   const [activeCategory, setActiveCategory] = useState('all')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [showItemForm, setShowItemForm] = useState(false)
   const [name, setName] = useState('')
-  const [categoryId, setCategoryId] = useState(categories[0]?.id ?? '')
+  const [categoryId, setCategoryId] = useState('')
   const [quantity, setQuantity] = useState(1)
+  const noneCategory = categories.find((category) => category.name === 'None')
 
   const matchedInventoryItem = useMemo(
     () =>
@@ -70,11 +74,32 @@ export function ShoppingList() {
 
   async function createItem(event: FormEvent) {
     event.preventDefault()
+    if (!categoryId) return
     if (await addShoppingItem({ name, categoryId, quantity })) {
       setName('')
+      setCategoryId(noneCategory?.id ?? '')
       setQuantity(1)
       setShowItemForm(false)
     }
+  }
+
+  function openNewItemForm() {
+    setName('')
+    setCategoryId(
+      activeCategory !== 'all' ? activeCategory : (noneCategory?.id ?? ''),
+    )
+    setQuantity(1)
+    setShowItemForm(true)
+  }
+
+  function quantityLabel(item: (typeof shoppingItems)[number]) {
+    return `${item.quantity} x ${
+      item.purchaseLabel || (item.purchaseUnit === 'pack' ? 'pack' : 'unit')
+    }`
+  }
+
+  function itemQuantity(item: (typeof shoppingItems)[number]) {
+    return Number(item.quantity)
   }
 
   return (
@@ -87,7 +112,7 @@ export function ShoppingList() {
           <IonTitle>Shopping list</IonTitle>
           {editable && (
             <IonButtons slot="end">
-              <IonButton onClick={() => setShowItemForm(true)}>
+              <IonButton onClick={openNewItemForm}>
                 <IonIcon slot="start" icon={addOutline} />
                 Add item
               </IonButton>
@@ -131,6 +156,23 @@ export function ShoppingList() {
             ))}
           </div>
 
+          <div className="view-toggle" aria-label="Shopping list view">
+            <button
+              className={viewMode === 'grid' ? 'active' : ''}
+              type="button"
+              onClick={() => setViewMode('grid')}
+            >
+              <IonIcon icon={gridOutline} /> Grid
+            </button>
+            <button
+              className={viewMode === 'list' ? 'active' : ''}
+              type="button"
+              onClick={() => setViewMode('list')}
+            >
+              <IonIcon icon={listOutline} /> List
+            </button>
+          </div>
+
           {visibleItems.length === 0 ? (
             <div className="empty-stock">
               <IonIcon icon={basketOutline} />
@@ -139,11 +181,20 @@ export function ShoppingList() {
                 Add something you need, or let inventory add it automatically.
               </IonText>
               {editable && (
-                <IonButton onClick={() => setShowItemForm(true)}>
+                <IonButton onClick={openNewItemForm}>
                   Add a shopping item
                 </IonButton>
               )}
             </div>
+          ) : viewMode === 'list' ? (
+            <section className="compact-item-list" aria-label="Shopping items">
+              {visibleItems.map((item) => (
+                <div className="compact-item-row" key={item.id}>
+                  <span>{item.name}</span>
+                  <strong>{quantityLabel(item)}</strong>
+                </div>
+              ))}
+            </section>
           ) : (
             <section className="shopping-list" aria-label="Shopping items">
               {visibleItems.map((item) => {
@@ -170,7 +221,7 @@ export function ShoppingList() {
                               disabled={!editable || item.quantity === 1}
                               aria-label={`Decrease ${item.name}`}
                               onClick={() =>
-                                setShoppingQuantity(item.id, item.quantity - 1)
+                                setShoppingQuantity(item.id, itemQuantity(item) - 1)
                               }
                             >
                               <IonIcon slot="icon-only" icon={removeOutline} />
@@ -193,7 +244,7 @@ export function ShoppingList() {
                               disabled={!editable}
                               aria-label={`Increase ${item.name}`}
                               onClick={() =>
-                                setShoppingQuantity(item.id, item.quantity + 1)
+                                setShoppingQuantity(item.id, itemQuantity(item) + 1)
                               }
                             >
                               <IonIcon slot="icon-only" icon={addOutline} />

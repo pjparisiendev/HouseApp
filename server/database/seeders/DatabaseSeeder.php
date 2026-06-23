@@ -25,7 +25,7 @@ class DatabaseSeeder extends Seeder
             ],
         );
 
-        foreach (['Fridge', 'Pantry', 'Household items'] as $category) {
+        foreach (['None', 'Fridge', 'Pantry', 'Household items'] as $category) {
             InventoryCategory::query()->firstOrCreate(['name' => $category]);
         }
     }

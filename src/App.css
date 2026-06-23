@@ -594,6 +594,70 @@
   color: var(--ion-color-primary);
 }
 
+.view-toggle {
+  display: inline-flex;
+  width: fit-content;
+  padding: 3px;
+  border: 1px solid var(--ion-color-light-shade);
+  border-radius: 999px;
+  background: var(--ion-color-light);
+}
+
+.view-toggle button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 999px;
+  color: var(--ion-color-medium-shade);
+  background: transparent;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.view-toggle button.active {
+  color: var(--ion-color-primary-contrast);
+  background: var(--ion-color-primary);
+}
+
+.compact-item-list {
+  display: grid;
+  gap: 8px;
+}
+
+.compact-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--ion-color-light-shade);
+  border-radius: 12px;
+  color: inherit;
+  background: var(--ion-background-color);
+  font: inherit;
+  text-align: left;
+}
+
+.compact-item-row span {
+  color: #000;
+  font-weight: 700;
+}
+
+.compact-item-row strong {
+  flex: 0 0 auto;
+  color: var(--ion-color-medium-shade);
+  font-size: 0.95rem;
+}
+
+button.compact-item-row {
+  cursor: pointer;
+}
+
 .stock-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -631,14 +695,22 @@
 
 .stock-card-heading h2,
 .shopping-details h2 {
-  margin: 9px 0 0;
+  margin: 0;
+  color: #000;
   font-size: 1.1rem;
+  font-weight: 700;
 }
 
 .stock-card-heading ion-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+
+.stock-category-badge {
+  margin-top: 8px;
+  color: var(--ion-color-medium);
+  font-weight: 500;
 }
 
 .stock-card-actions {

@@ -90,10 +90,10 @@ function mapInventoryItem(item: InventoryItemDto): InventoryItem {
     id: String(item.id),
     name: item.name,
     categoryId: String(item.inventory_category_id),
-    quantity: item.quantity,
-    lowStockThreshold: item.low_stock_threshold,
+    quantity: Number(item.quantity),
+    lowStockThreshold: Number(item.low_stock_threshold),
     subQuantityEnabled: item.sub_quantity_enabled,
-    unitsPerPack: item.units_per_pack,
+    unitsPerPack: Number(item.units_per_pack),
     unitLabel: item.unit_label ?? '',
     packLabel: item.pack_label ?? '',
     lowStockThresholdMode: item.low_stock_threshold_mode,
@@ -106,13 +106,13 @@ function mapShoppingItem(item: ShoppingItemDto): ShoppingItem {
     id: String(item.id),
     name: item.name,
     categoryId: String(item.inventory_category_id),
-    quantity: item.quantity,
+    quantity: Number(item.quantity),
     inventoryItemId: item.inventory_item_id
       ? String(item.inventory_item_id)
       : undefined,
     automatic: item.automatic,
     purchaseUnit: item.purchase_unit,
-    unitsPerPurchase: item.units_per_purchase,
+    unitsPerPurchase: Number(item.units_per_purchase),
     purchaseLabel: item.purchase_label ?? '',
   }
 }
@@ -252,7 +252,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   async function setInventoryQuantity(itemId: string, quantity: number) {
     const item = inventoryItems.find((candidate) => candidate.id === itemId)
     if (!item) return
-    await updateInventoryItem({ ...item, quantity: Math.max(0, quantity) })
+    await updateInventoryItem({ ...item, quantity: Math.max(0, Number(quantity)) })
   }
 
   async function addShoppingItem(
@@ -277,7 +277,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   async function setShoppingQuantity(itemId: string, quantity: number) {
     await api(`/shopping-items/${itemId}`, {
       method: 'PUT',
-      body: JSON.stringify({ quantity: Math.max(1, quantity) }),
+      body: JSON.stringify({ quantity: Math.max(1, Number(quantity)) }),
     })
     await refreshHousehold()
   }

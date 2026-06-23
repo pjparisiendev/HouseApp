@@ -26,6 +26,8 @@ import {
   eyeOffOutline,
   eyeOutline,
   imageOutline,
+  gridOutline,
+  listOutline,
   pencilOutline,
   removeOutline,
   trashOutline,
@@ -57,12 +59,13 @@ export function Inventory() {
   } = useHousehold()
   const editable = can('edit_household')
   const [activeCategory, setActiveCategory] = useState('all')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [showCategoryForm, setShowCategoryForm] = useState(false)
   const [showItemForm, setShowItemForm] = useState(false)
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [categoryName, setCategoryName] = useState('')
   const [itemName, setItemName] = useState('')
-  const [itemCategory, setItemCategory] = useState(categories[0]?.id ?? '')
+  const [itemCategory, setItemCategory] = useState('')
   const [quantity, setQuantity] = useState(1)
   const [lowStockThreshold, setLowStockThreshold] = useState(0)
   const [subQuantityEnabled, setSubQuantityEnabled] = useState(false)
@@ -77,6 +80,7 @@ export function Inventory() {
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null)
 
   const editingItem = inventoryItems.find((item) => item.id === editingItemId)
+  const noneCategory = categories.find((category) => category.name === 'None')
 
   const visibleItems = useMemo(
     () =>
@@ -97,11 +101,21 @@ export function Inventory() {
     }
   }
 
+  function quantityLabel(item: InventoryItem) {
+    return item.subQuantityEnabled
+      ? `${item.quantity} ${item.unitLabel}`
+      : String(item.quantity)
+  }
+
+  function itemQuantity(item: InventoryItem) {
+    return Number(item.quantity)
+  }
+
   function resetItemForm() {
     pendingImages.forEach((image) => URL.revokeObjectURL(image.previewUrl))
     setEditingItemId(null)
     setItemName('')
-    setItemCategory(categories[0]?.id ?? '')
+    setItemCategory(noneCategory?.id ?? '')
     setQuantity(1)
     setLowStockThreshold(0)
     setSubQuantityEnabled(false)
@@ -115,6 +129,9 @@ export function Inventory() {
 
   function openNewItemForm() {
     resetItemForm()
+    setItemCategory(
+      activeCategory !== 'all' ? activeCategory : (noneCategory?.id ?? ''),
+    )
     setShowItemForm(true)
   }
 
@@ -135,6 +152,10 @@ export function Inventory() {
 
   async function saveItem(event: FormEvent) {
     event.preventDefault()
+    if (!itemCategory) {
+      setMessage('Choose a category before saving.')
+      return
+    }
     const saved = editingItemId
       ? await updateInventoryItem({
           id: editingItemId,
@@ -275,6 +296,23 @@ export function Inventory() {
             )}
           </div>
 
+          <div className="view-toggle" aria-label="Inventory view">
+            <button
+              className={viewMode === 'grid' ? 'active' : ''}
+              type="button"
+              onClick={() => setViewMode('grid')}
+            >
+              <IonIcon icon={gridOutline} /> Grid
+            </button>
+            <button
+              className={viewMode === 'list' ? 'active' : ''}
+              type="button"
+              onClick={() => setViewMode('list')}
+            >
+              <IonIcon icon={listOutline} /> List
+            </button>
+          </div>
+
           {visibleItems.length === 0 ? (
             <div className="empty-stock">
               <IonIcon icon={cubeOutline} />
@@ -288,6 +326,20 @@ export function Inventory() {
                 </IonButton>
               )}
             </div>
+          ) : viewMode === 'list' ? (
+            <section className="compact-item-list" aria-label="Inventory items">
+              {visibleItems.map((item) => (
+                <button
+                  className="compact-item-row"
+                  key={item.id}
+                  type="button"
+                  onClick={() => editable && openEditItemForm(item)}
+                >
+                  <span>{item.name}</span>
+                  <strong>{quantityLabel(item)}</strong>
+                </button>
+              ))}
+            </section>
           ) : (
             <section className="stock-grid" aria-label="Inventory items">
               {visibleItems.map((item) => {
@@ -297,15 +349,15 @@ export function Inventory() {
                 const thresholdInUnits =
                   item.subQuantityEnabled &&
                   item.lowStockThresholdMode === 'pack'
-                    ? item.lowStockThreshold * item.unitsPerPack
-                    : item.lowStockThreshold
+                    ? Number(item.lowStockThreshold) * Number(item.unitsPerPack)
+                    : Number(item.lowStockThreshold)
                 const isLow =
-                  thresholdInUnits > 0 && item.quantity < thresholdInUnits
+                  thresholdInUnits > 0 && itemQuantity(item) < thresholdInUnits
                 const fullPacks = item.subQuantityEnabled
-                  ? Math.floor(item.quantity / item.unitsPerPack)
+                  ? Math.floor(itemQuantity(item) / Number(item.unitsPerPack))
                   : 0
                 const remainingUnits = item.subQuantityEnabled
-                  ? item.quantity % item.unitsPerPack
+                  ? itemQuantity(item) % Number(item.unitsPerPack)
                   : 0
                 return (
                   <IonCard
@@ -315,8 +367,10 @@ export function Inventory() {
                     <IonCardContent>
                       <div className="stock-card-heading">
                         <div>
-                          <IonBadge color="light">{category?.name}</IonBadge>
                           <h2>{item.name}</h2>
+                          <IonBadge className="stock-category-badge" color="light">
+                            {category?.name}
+                          </IonBadge>
                         </div>
                         <div className="stock-card-actions">
                           {isLow && (
@@ -386,7 +440,7 @@ export function Inventory() {
                           aria-label={`Decrease ${item.name}`}
                           disabled={!editable || item.quantity === 0}
                           onClick={() =>
-                            setInventoryQuantity(item.id, item.quantity - 1)
+                            setInventoryQuantity(item.id, itemQuantity(item) - 1)
                           }
                         >
                           <IonIcon slot="icon-only" icon={removeOutline} />
@@ -409,7 +463,7 @@ export function Inventory() {
                           aria-label={`Increase ${item.name}`}
                           disabled={!editable}
                           onClick={() =>
-                            setInventoryQuantity(item.id, item.quantity + 1)
+                            setInventoryQuantity(item.id, itemQuantity(item) + 1)
                           }
                         >
                           <IonIcon slot="icon-only" icon={addOutline} />
@@ -420,11 +474,14 @@ export function Inventory() {
                           <IonButton
                             size="small"
                             fill="outline"
-                            disabled={!editable || item.quantity < item.unitsPerPack}
+                            disabled={
+                              !editable ||
+                              itemQuantity(item) < Number(item.unitsPerPack)
+                            }
                             onClick={() =>
                               setInventoryQuantity(
                                 item.id,
-                                item.quantity - item.unitsPerPack,
+                                itemQuantity(item) - Number(item.unitsPerPack),
                               )
                             }
                           >
@@ -437,7 +494,7 @@ export function Inventory() {
                             onClick={() =>
                               setInventoryQuantity(
                                 item.id,
-                                item.quantity + item.unitsPerPack,
+                                itemQuantity(item) + Number(item.unitsPerPack),
                               )
                             }
                           >
@@ -534,6 +591,9 @@ export function Inventory() {
                 onIonChange={(event) => setItemCategory(event.detail.value)}
                 required
               >
+                <IonSelectOption value="" disabled>
+                  Choose category
+                </IonSelectOption>
                 {categories.map((category) => (
                   <IonSelectOption key={category.id} value={category.id}>
                     {category.name}

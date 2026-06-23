@@ -12,4 +12,9 @@ class InventoryCategory extends Model
     {
         return $this->hasMany(InventoryItem::class);
     }
+
+    public function shoppingItems()
+    {
+        return $this->hasMany(ShoppingItem::class);
+    }
 }
