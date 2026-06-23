@@ -1,0 +1,1209 @@
+.dashboard {
+  width: min(100%, 960px);
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.welcome {
+  padding: 28px 4px 20px;
+}
+
+.welcome-badges {
+  display: flex;
+  gap: 8px;
+}
+
+.welcome h1 {
+  max-width: 620px;
+  margin: 14px 0 10px;
+  font-size: clamp(2rem, 7vw, 3.5rem);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
+.welcome ion-text {
+  display: block;
+  max-width: 580px;
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+.section-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.section-card {
+  margin: 0;
+  border: 1px solid var(--ion-color-light-shade);
+  border-radius: 18px;
+  box-shadow: none;
+}
+
+.section-card ion-card-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  min-height: 130px;
+  padding: 22px;
+}
+
+.section-card ion-icon {
+  flex: 0 0 auto;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--ion-color-light);
+  font-size: 28px;
+}
+
+.section-card h2 {
+  margin: 3px 0 7px;
+  color: var(--ion-text-color);
+  font-size: 1.15rem;
+}
+
+.section-card p {
+  margin: 0;
+  color: var(--ion-color-medium);
+  line-height: 1.45;
+}
+
+.login-page::part(background) {
+  background:
+    radial-gradient(circle at 15% 15%, rgba(56, 128, 255, 0.16), transparent 32%),
+    var(--ion-background-color);
+}
+
+.login-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 440px);
+  align-items: center;
+  gap: 72px;
+  width: min(100% - 32px, 1000px);
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 48px 0;
+}
+
+.brand-mark {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border-radius: 16px;
+  color: white;
+  background: var(--ion-color-primary);
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.eyebrow {
+  margin: 18px 0 8px;
+  color: var(--ion-color-primary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.login-intro h1,
+.admin-layout > section h1 {
+  margin: 0 0 12px;
+  font-size: clamp(2.5rem, 7vw, 4.5rem);
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.login-card,
+.admin-card {
+  margin: 0;
+  border: 1px solid var(--ion-color-light-shade);
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(20, 35, 60, 0.1);
+}
+
+.login-card ion-card-content,
+.admin-card ion-card-content {
+  padding: 28px;
+}
+
+.login-card h2,
+.admin-card h2 {
+  margin: 0 0 10px;
+}
+
+.prototype-note {
+  display: block;
+  margin-bottom: 16px;
+}
+
+.login-card form {
+  display: grid;
+  gap: 14px;
+}
+
+.login-card ion-item {
+  --padding-start: 0;
+}
+
+.form-message {
+  display: block;
+  margin: 12px 0;
+  font-size: 0.9rem;
+}
+
+.demo-credentials {
+  margin: 18px 0 0;
+  color: var(--ion-color-medium);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.admin-layout {
+  display: grid;
+  gap: 22px;
+  width: min(100% - 32px, 900px);
+  margin: 0 auto;
+  padding: 40px 0 64px;
+}
+
+.admin-layout > section h1 {
+  font-size: clamp(2rem, 6vw, 3.5rem);
+}
+
+.user-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.profile-layout {
+  display: grid;
+  gap: 28px;
+  width: min(100% - 32px, 900px);
+  margin: 0 auto;
+  padding: 40px 0 64px;
+}
+
+.profile-layout h1 {
+  margin: 0 0 8px;
+  font-size: clamp(2.25rem, 6vw, 3.75rem);
+  letter-spacing: -0.04em;
+}
+
+.profile-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 18px;
+}
+
+.profile-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.calendar-layout {
+  display: grid;
+  gap: 28px;
+  width: min(100% - 28px, 1280px);
+  margin: 0 auto;
+  padding: 36px 0 64px;
+}
+
+.calendar-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.calendar-heading h1 {
+  margin: 0 0 8px;
+  font-size: clamp(2.25rem, 6vw, 3.75rem);
+  letter-spacing: -0.04em;
+}
+
+.calendar-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(300px, 0.75fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.calendar-card {
+  margin: 0;
+  border: 1px solid var(--ion-color-light-shade);
+  border-radius: 20px;
+  box-shadow: none;
+}
+
+.calendar-card ion-card-content {
+  padding: 18px;
+}
+
+.month-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.month-toolbar h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.weekday-row {
+  color: var(--ion-color-medium);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.weekday-row div {
+  padding: 8px 4px 12px;
+}
+
+.month-grid {
+  overflow: hidden;
+  border-top: 1px solid var(--ion-color-light-shade);
+  border-left: 1px solid var(--ion-color-light-shade);
+  border-radius: 14px;
+}
+
+.calendar-day {
+  position: relative;
+  min-width: 0;
+  min-height: 112px;
+  padding: 8px;
+  overflow: hidden;
+  border: 0;
+  border-right: 1px solid var(--ion-color-light-shade);
+  border-bottom: 1px solid var(--ion-color-light-shade);
+  color: var(--ion-text-color);
+  background: var(--ion-background-color);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.calendar-day:hover {
+  background: var(--ion-color-light);
+}
+
+.calendar-day.outside-month {
+  color: var(--ion-color-medium);
+  background: rgba(var(--ion-color-light-rgb), 0.45);
+}
+
+.calendar-day.selected {
+  box-shadow: inset 0 0 0 2px var(--ion-color-primary);
+  z-index: 1;
+}
+
+.day-number {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  margin-bottom: 4px;
+  border-radius: 50%;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.calendar-day.today .day-number {
+  color: var(--ion-color-primary-contrast);
+  background: var(--ion-color-primary);
+}
+
+.day-events {
+  display: grid;
+  gap: 3px;
+}
+
+.event-pill {
+  display: block;
+  padding: 3px 6px;
+  overflow: hidden;
+  border-radius: 5px;
+  color: #17467a;
+  background: #e5f1ff;
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event-pill.appointment {
+  color: #6b3b00;
+  background: #fff0d6;
+}
+
+.event-pill.reminder {
+  color: #554000;
+  background: #fff8bd;
+}
+
+.event-pill.social {
+  color: #5a2b78;
+  background: #f2e5ff;
+}
+
+.more-events {
+  padding-left: 5px;
+  color: var(--ion-color-medium);
+  font-size: 0.65rem;
+}
+
+.agenda-panel {
+  padding: 20px;
+  border: 1px solid var(--ion-color-light-shade);
+  border-radius: 20px;
+  background: var(--ion-card-background, var(--ion-background-color));
+}
+
+.agenda-heading,
+.agenda-item-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.agenda-heading .eyebrow {
+  margin-top: 0;
+}
+
+.agenda-heading h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.empty-agenda {
+  display: grid;
+  justify-items: start;
+  gap: 18px;
+  padding: 48px 0 24px;
+}
+
+.agenda-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.agenda-item {
+  padding: 14px 14px 14px 16px;
+  border-left: 4px solid var(--ion-color-primary);
+  border-radius: 10px;
+  background: var(--ion-color-light);
+}
+
+.agenda-item.appointment {
+  border-left-color: var(--ion-color-warning);
+}
+
+.agenda-item.reminder {
+  border-left-color: #d6aa00;
+}
+
+.agenda-item.social {
+  border-left-color: var(--ion-color-tertiary);
+}
+
+.agenda-item h3 {
+  margin: 3px 0 8px;
+  font-size: 1rem;
+}
+
+.agenda-item-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.agenda-item-actions ion-button {
+  min-height: 34px;
+  margin: 0;
+}
+
+.category-label {
+  color: var(--ion-color-medium);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.event-time {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.event-notes {
+  margin: 0 0 10px;
+  color: var(--ion-color-medium-shade);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.event-form {
+  display: grid;
+  gap: 16px;
+  width: min(100% - 32px, 620px);
+  margin: 0 auto;
+  padding: 32px 0 64px;
+}
+
+.event-note-view {
+  display: grid;
+  gap: 24px;
+  width: min(100% - 32px, 620px);
+  margin: 0 auto;
+  padding: 32px 0 64px;
+}
+
+.event-note-heading h2 {
+  margin: 5px 0 8px;
+  font-size: 1.5rem;
+}
+
+.empty-event-notes {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 44px 20px;
+  border: 1px dashed var(--ion-color-light-shade);
+  border-radius: 16px;
+  text-align: center;
+}
+
+.empty-event-notes ion-icon {
+  color: var(--ion-color-primary);
+  font-size: 34px;
+}
+
+.event-note-list {
+  display: grid;
+  gap: 12px;
+}
+
+.event-note {
+  padding: 16px;
+  border-left: 4px solid var(--ion-color-primary);
+  border-radius: 10px;
+  background: var(--ion-color-light);
+}
+
+.event-note p {
+  margin: 0 0 10px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.event-note-form {
+  display: grid;
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid var(--ion-color-light-shade);
+}
+
+.time-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.stock-layout {
+  display: grid;
+  gap: 26px;
+  width: min(100% - 28px, 1100px);
+  margin: 0 auto;
+  padding: 36px 0 64px;
+}
+
+.stock-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.stock-heading h1 {
+  margin: 0 0 8px;
+  font-size: clamp(2.25rem, 6vw, 3.75rem);
+  letter-spacing: -0.04em;
+}
+
+.category-bar {
+  display: flex;
+  gap: 8px;
+  padding-bottom: 4px;
+  overflow-x: auto;
+}
+
+.category-bar button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  padding: 9px 14px;
+  border: 1px solid var(--ion-color-light-shade);
+  border-radius: 999px;
+  color: var(--ion-color-medium-shade);
+  background: var(--ion-background-color);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.category-bar button.active {
+  border-color: var(--ion-color-primary);
+  color: var(--ion-color-primary-contrast);
+  background: var(--ion-color-primary);
+}
+
+.category-bar button.add-category {
+  border-style: dashed;
+  color: var(--ion-color-primary);
+}
+
+.stock-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.stock-card,
+.shopping-card {
+  margin: 0;
+  border: 1px solid var(--ion-color-light-shade);
+  border-radius: 18px;
+  box-shadow: none;
+}
+
+.stock-card.low-stock {
+  border-color: rgba(var(--ion-color-danger-rgb), 0.45);
+}
+
+.stock-card.image-expanded {
+  grid-column: 1 / -1;
+}
+
+.stock-card ion-card-content,
+.shopping-card ion-card-content {
+  padding: 20px;
+}
+
+.stock-card-heading,
+.shopping-details {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.stock-card-heading h2,
+.shopping-details h2 {
+  margin: 9px 0 0;
+  font-size: 1.1rem;
+}
+
+.stock-card-heading ion-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stock-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.stock-card-actions ion-button {
+  width: 36px;
+  height: 36px;
+  margin: 0;
+}
+
+.stock-card-actions ion-button.view-image-button {
+  width: auto;
+}
+
+.stock-image-view {
+  display: block;
+  min-height: 120px;
+  place-items: center;
+  margin: 18px 0;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--ion-color-light);
+}
+
+.shared-image-gallery {
+  display: grid;
+  width: 100%;
+  gap: 12px;
+}
+
+.gallery-main {
+  position: relative;
+  display: grid;
+  min-height: 220px;
+  place-items: center;
+}
+
+.gallery-main > img {
+  display: block;
+  width: 100%;
+  max-height: 480px;
+  object-fit: contain;
+  border-radius: 10px;
+}
+
+.gallery-main ion-button {
+  position: absolute;
+  top: 50%;
+  width: 40px;
+  height: 40px;
+  margin: 0;
+  transform: translateY(-50%);
+}
+
+.gallery-previous {
+  left: 8px;
+}
+
+.gallery-next {
+  right: 8px;
+}
+
+.gallery-count {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+}
+
+.gallery-thumbnails {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.gallery-thumbnails button {
+  position: relative;
+  flex: 0 0 70px;
+  width: 70px;
+  height: 58px;
+  padding: 2px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: var(--ion-color-light);
+  cursor: pointer;
+}
+
+.gallery-thumbnails button.active {
+  border-color: var(--ion-color-primary);
+}
+
+.gallery-thumbnails img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 5px;
+}
+
+.gallery-thumbnails ion-icon {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  padding: 2px;
+  border-radius: 50%;
+  color: white;
+  background: var(--ion-color-warning);
+  font-size: 12px;
+}
+
+.gallery-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.stock-image-view img {
+  display: block;
+  width: 100%;
+  max-height: 480px;
+  object-fit: contain;
+  border-radius: 10px;
+}
+
+.quantity-control {
+  display: grid;
+  grid-template-columns: 42px 64px 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 24px 0 14px;
+}
+
+.quantity-control ion-button {
+  width: 42px;
+  height: 42px;
+  margin: 0;
+}
+
+.quantity-control ion-input {
+  --padding-start: 4px;
+  --padding-end: 4px;
+  min-height: 42px;
+  border: 1px solid var(--ion-color-light-shade);
+  border-radius: 10px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.stock-quantity-summary {
+  display: grid;
+  gap: 3px;
+  margin: 20px 0 -10px;
+  text-align: center;
+}
+
+.stock-quantity-summary strong {
+  font-size: 1.05rem;
+}
+
+.stock-quantity-summary span {
+  color: var(--ion-color-medium);
+  font-size: 0.78rem;
+}
+
+.pack-quantity-control {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: -2px 0 14px;
+}
+
+.pack-quantity-control ion-button {
+  margin: 0;
+  font-size: 0.72rem;
+}
+
+.empty-stock {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 72px 20px;
+  border: 1px dashed var(--ion-color-light-shade);
+  border-radius: 20px;
+  text-align: center;
+}
+
+.empty-stock > ion-icon {
+  color: var(--ion-color-primary);
+  font-size: 42px;
+}
+
+.empty-stock h2 {
+  margin: 4px 0 0;
+}
+
+.empty-stock ion-button {
+  margin-top: 10px;
+}
+
+.simple-modal-form {
+  display: grid;
+  gap: 16px;
+  width: min(100% - 32px, 620px);
+  margin: 0 auto;
+  padding: 32px 0 64px;
+}
+
+.pack-toggle {
+  display: grid;
+  gap: 7px;
+  padding: 16px;
+  border: 1px solid var(--ion-color-light-shade);
+  border-radius: 12px;
+}
+
+.inventory-image-field {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--ion-color-light-shade);
+  border-radius: 12px;
+}
+
+.inventory-image-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.inventory-image-heading > ion-icon {
+  color: var(--ion-color-primary);
+  font-size: 26px;
+}
+
+.inventory-image-heading div {
+  display: grid;
+  gap: 3px;
+}
+
+.inventory-image-preview {
+  display: block;
+  width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+  border-radius: 10px;
+  background: var(--ion-color-light);
+}
+
+.pending-image-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pending-image {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+}
+
+.pending-image img {
+  width: 100%;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.pending-image ion-button {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 30px;
+  height: 30px;
+  margin: 0;
+}
+
+.shared-image-uploader {
+  display: grid;
+  gap: 8px;
+}
+
+.inventory-image-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.file-picker-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 8px 13px;
+  border: 1px solid var(--ion-color-primary);
+  border-radius: 8px;
+  color: var(--ion-color-primary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.file-picker-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.file-picker-button.disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.pack-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.number-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.shopping-list {
+  display: grid;
+  gap: 12px;
+}
+
+.shopping-details {
+  align-items: center;
+}
+
+.item-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.quantity-control.compact {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.shopping-quantity-block {
+  display: grid;
+  flex: 0 0 auto;
+  justify-items: center;
+  gap: 7px;
+}
+
+.shopping-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--ion-color-light-shade);
+}
+
+.wishlist-layout {
+  display: grid;
+  gap: 26px;
+  width: min(100% - 28px, 1100px);
+  margin: 0 auto;
+  padding: 36px 0 64px;
+}
+
+.wishlist-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.wishlist-card {
+  margin: 0;
+  border: 1px solid var(--ion-color-light-shade);
+  border-radius: 18px;
+  box-shadow: none;
+}
+
+.wishlist-card ion-card-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 190px;
+  padding: 20px;
+}
+
+.wishlist-card-heading,
+.wishlist-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wishlist-card-heading ion-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.wishlist-card-heading ion-button {
+  width: 36px;
+  height: 36px;
+  margin: 0;
+}
+
+.wishlist-card h2 {
+  margin: 14px 0 8px;
+  color: var(--ion-text-color);
+  font-size: 1.2rem;
+}
+
+.wishlist-notes {
+  margin: 0 0 18px;
+  color: var(--ion-color-medium-shade);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.wishlist-meta {
+  align-items: end;
+  margin-top: auto;
+}
+
+.wishlist-meta ion-button {
+  margin: 0 -10px -8px 0;
+}
+
+@media (max-width: 960px) {
+  .calendar-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .stock-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .wishlist-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard {
+    padding-top: 8px;
+  }
+
+  .section-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .section-card ion-card-content {
+    min-height: auto;
+  }
+
+  .login-shell {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    padding: 28px 0;
+  }
+
+  .login-intro h1 {
+    font-size: 3rem;
+  }
+
+  .user-form {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-heading {
+    align-items: start;
+  }
+
+  .agenda-item-heading {
+    flex-direction: column;
+  }
+
+  .agenda-item-actions {
+    align-self: stretch;
+    justify-content: flex-end;
+  }
+
+  .calendar-card ion-card-content {
+    padding: 8px;
+  }
+
+  .calendar-day {
+    min-height: 58px;
+    padding: 4px;
+  }
+
+  .day-number {
+    width: 24px;
+    height: 24px;
+  }
+
+  .event-pill {
+    width: 10px;
+    height: 10px;
+    padding: 0;
+    border: 1px solid rgba(0, 0, 0, 0.18);
+    border-radius: 50%;
+    color: transparent;
+    background: #1477e2;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+  }
+
+  .event-pill.appointment {
+    background: #e58400;
+  }
+
+  .event-pill.reminder {
+    background: #c49a00;
+  }
+
+  .event-pill.social {
+    background: #8a3fd1;
+  }
+
+  .more-events {
+    display: none;
+  }
+
+  .time-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .stock-heading {
+    align-items: start;
+  }
+
+  .stock-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .number-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .pack-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .shopping-details {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .quantity-control.compact {
+    margin-top: 12px;
+  }
+}
