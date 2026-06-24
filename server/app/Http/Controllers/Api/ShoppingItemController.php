@@ -7,6 +7,7 @@ use App\Models\InventoryItem;
 use App\Models\ShoppingItem;
 use App\Services\InventoryService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ShoppingItemController extends Controller
 {
@@ -14,17 +15,30 @@ class ShoppingItemController extends Controller
 
     public function index()
     {
-        return ShoppingItem::query()->with('category')->orderBy('name')->get();
+        abort_unless(request()->user()->household_id, 403);
+
+        return ShoppingItem::query()
+            ->where('household_id', request()->user()->household_id)
+            ->with('category')
+            ->orderBy('name')
+            ->get();
     }
 
     public function store(Request $request)
     {
+        abort_unless($request->user()->household_id, 403);
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:100'],
-            'inventory_category_id' => ['required', 'exists:inventory_categories,id'],
+            'inventory_category_id' => [
+                'required',
+                Rule::exists('inventory_categories', 'id')
+                    ->where('household_id', $request->user()->household_id),
+            ],
             'quantity' => ['required', 'integer', 'min:1'],
         ]);
         $inventoryItem = InventoryItem::query()
+            ->where('household_id', $request->user()->household_id)
             ->where('inventory_category_id', $data['inventory_category_id'])
             ->whereRaw('LOWER(name) = ?', [mb_strtolower($data['name'])])
             ->first();
@@ -36,6 +50,7 @@ class ShoppingItemController extends Controller
             ? $inventoryItem->pack_label
             : null;
         $existing = ShoppingItem::query()
+            ->where('household_id', $request->user()->household_id)
             ->where('inventory_category_id', $data['inventory_category_id'])
             ->whereRaw('LOWER(name) = ?', [mb_strtolower($data['name'])])
             ->where('purchase_unit', $purchaseUnit)
@@ -52,6 +67,7 @@ class ShoppingItemController extends Controller
             return $existing->fresh()->load('category');
         }
 
+        $data['household_id'] = $request->user()->household_id;
         $data['inventory_item_id'] = $inventoryItem?->id;
         $data['automatic'] = false;
         $data['purchase_unit'] = $purchaseUnit;
@@ -63,6 +79,8 @@ class ShoppingItemController extends Controller
 
     public function update(Request $request, ShoppingItem $shoppingItem)
     {
+        $this->authorizeHousehold($request, $shoppingItem);
+
         $data = $request->validate(['quantity' => ['required', 'integer', 'min:1']]);
         $shoppingItem->update($data);
 
@@ -71,6 +89,8 @@ class ShoppingItemController extends Controller
 
     public function destroy(ShoppingItem $shoppingItem)
     {
+        abort_unless(request()->user()->household_id === $shoppingItem->household_id, 404);
+
         $shoppingItem->delete();
 
         return response()->noContent();
@@ -78,6 +98,13 @@ class ShoppingItemController extends Controller
 
     public function acquire(ShoppingItem $shoppingItem)
     {
+        abort_unless(request()->user()->household_id === $shoppingItem->household_id, 404);
+
         return response()->json($this->inventoryService->acquire($shoppingItem));
+    }
+
+    private function authorizeHousehold(Request $request, ShoppingItem $shoppingItem): void
+    {
+        abort_unless($request->user()->household_id === $shoppingItem->household_id, 404);
     }
 }

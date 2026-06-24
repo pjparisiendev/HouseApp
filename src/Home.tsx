@@ -16,10 +16,12 @@ import {
   basketOutline,
   calendarOutline,
   cubeOutline,
+  bugOutline,
   heartOutline,
   logOutOutline,
   peopleOutline,
   personCircleOutline,
+  businessOutline,
 } from 'ionicons/icons'
 import { useHistory } from 'react-router-dom'
 import { roleLabels, useAuth } from './auth'
@@ -53,6 +55,13 @@ const sections = [
     color: 'tertiary',
     route: '/wishlist',
   },
+  {
+    title: 'Feedback',
+    description: 'Report bugs and request HouseApp features.',
+    icon: bugOutline,
+    color: 'danger',
+    route: '/feedback',
+  },
 ]
 
 export function Home() {
@@ -80,6 +89,12 @@ export function Home() {
                 Users
               </IonButton>
             )}
+            {can('manage_households') && (
+              <IonButton onClick={() => history.push('/admin/households')}>
+                <IonIcon slot="start" icon={businessOutline} />
+                Households
+              </IonButton>
+            )}
             <IonButton aria-label="Sign out" onClick={() => void signOut()}>
               <IonIcon slot="icon-only" icon={logOutOutline} />
             </IonButton>
@@ -96,7 +111,9 @@ export function Home() {
         <main className="dashboard">
           <section className="welcome">
             <div className="welcome-badges">
-              <IonBadge color="light">Our household</IonBadge>
+              <IonBadge color="light">
+                {currentUser?.household?.name ?? 'Household'}
+              </IonBadge>
               {currentUser && (
                 <IonBadge color="primary">
                   {roleLabels[currentUser.role]}

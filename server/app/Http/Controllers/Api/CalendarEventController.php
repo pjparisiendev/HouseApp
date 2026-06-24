@@ -11,8 +11,11 @@ class CalendarEventController extends Controller
 {
     public function index()
     {
+        abort_unless(request()->user()->household_id, 403);
+
         return CalendarEvent::query()
-            ->with(['creator:id,name', 'eventNotes.author:id,name'])
+            ->where('household_id', request()->user()->household_id)
+            ->with(['creator:id,name', 'eventNotes.author:id,name', 'reminders'])
             ->orderBy('event_date')
             ->orderBy('start_time')
             ->get();
@@ -20,24 +23,41 @@ class CalendarEventController extends Controller
 
     public function store(Request $request)
     {
+        abort_unless($request->user()->household_id, 403);
+
         $data = $this->validateEvent($request);
+        $reminders = $data['reminders'] ?? [];
+        unset($data['reminders']);
+        $data['household_id'] = $request->user()->household_id;
         $data['created_by'] = $request->user()->id;
 
+        $calendarEvent = CalendarEvent::query()->create($data);
+        $this->syncReminders($calendarEvent, $reminders);
+
         return response()->json(
-            CalendarEvent::query()->create($data)->load(['creator:id,name', 'eventNotes.author:id,name']),
+            $calendarEvent->load(['creator:id,name', 'eventNotes.author:id,name', 'reminders']),
             201,
         );
     }
 
     public function update(Request $request, CalendarEvent $calendarEvent)
     {
-        $calendarEvent->update($this->validateEvent($request));
+        $this->authorizeHousehold($request, $calendarEvent);
 
-        return $calendarEvent->fresh()->load(['creator:id,name', 'eventNotes.author:id,name']);
+        $data = $this->validateEvent($request);
+        $reminders = $data['reminders'] ?? [];
+        unset($data['reminders']);
+
+        $calendarEvent->update($data);
+        $this->syncReminders($calendarEvent, $reminders);
+
+        return $calendarEvent->fresh()->load(['creator:id,name', 'eventNotes.author:id,name', 'reminders']);
     }
 
     public function destroy(CalendarEvent $calendarEvent)
     {
+        abort_unless(request()->user()->household_id === $calendarEvent->household_id, 404);
+
         $calendarEvent->delete();
 
         return response()->noContent();
@@ -52,6 +72,29 @@ class CalendarEventController extends Controller
             'end_time' => ['nullable', 'date_format:H:i', 'after_or_equal:start_time'],
             'category' => ['required', Rule::in(['home', 'appointment', 'reminder', 'social'])],
             'notes' => ['nullable', 'string', 'max:5000'],
+            'reminders' => ['sometimes', 'array', 'max:10'],
+            'reminders.*.minutes_before' => ['required', 'integer', 'min:0', 'max:43200'],
         ]);
+    }
+
+    private function syncReminders(CalendarEvent $calendarEvent, array $reminders): void
+    {
+        $minutes = collect($reminders)
+            ->pluck('minutes_before')
+            ->map(fn ($value) => (int) $value)
+            ->unique()
+            ->sortDesc()
+            ->values();
+
+        $calendarEvent->reminders()->delete();
+
+        foreach ($minutes as $minutesBefore) {
+            $calendarEvent->reminders()->create(['minutes_before' => $minutesBefore]);
+        }
+    }
+
+    private function authorizeHousehold(Request $request, CalendarEvent $calendarEvent): void
+    {
+        abort_unless($request->user()->household_id === $calendarEvent->household_id, 404);
     }
 }

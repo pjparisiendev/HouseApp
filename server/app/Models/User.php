@@ -11,7 +11,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'username', 'password', 'role'])]
+#[Fillable(['household_id', 'name', 'username', 'password', 'role', 'is_platform_owner'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -26,7 +26,16 @@ class User extends Authenticatable
 
     public function hasPermission(string $permission): bool
     {
+        if ($this->is_platform_owner && in_array($permission, ['manage_households', 'manage_feedback'], true)) {
+            return true;
+        }
+
         return in_array($permission, self::ROLE_PERMISSIONS[$this->role] ?? [], true);
+    }
+
+    public function household()
+    {
+        return $this->belongsTo(Household::class);
     }
 
     /**
@@ -38,6 +47,7 @@ class User extends Authenticatable
     {
         return [
             'password' => 'hashed',
+            'is_platform_owner' => 'boolean',
         ];
     }
 }

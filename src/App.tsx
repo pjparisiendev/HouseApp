@@ -4,7 +4,10 @@ import { Redirect, Route } from 'react-router-dom'
 import './App.css'
 import { AuthProvider, useAuth } from './auth'
 import { Calendar } from './Calendar'
+import { Feedback } from './Feedback'
+import { FeedbackBubble } from './FeedbackBubble'
 import { Home } from './Home'
+import { HouseholdManagement } from './HouseholdManagement'
 import { HouseholdProvider } from './household'
 import { Inventory } from './Inventory'
 import { Login } from './Login'
@@ -43,9 +46,19 @@ function Routes() {
       <Route exact path="/wishlist">
         {currentUser ? <Wishlist /> : <Redirect to="/login" />}
       </Route>
+      <Route exact path="/feedback">
+        {currentUser ? <Feedback /> : <Redirect to="/login" />}
+      </Route>
       <Route exact path="/admin/users">
         {currentUser && can('manage_users') ? (
           <UserManagement />
+        ) : (
+          <Redirect to={currentUser ? '/home' : '/login'} />
+        )}
+      </Route>
+      <Route exact path="/admin/households">
+        {currentUser && can('manage_households') ? (
+          <HouseholdManagement />
         ) : (
           <Redirect to={currentUser ? '/home' : '/login'} />
         )}
@@ -64,6 +77,7 @@ function App() {
         <HouseholdProvider>
           <IonReactRouter>
             <Routes />
+            <FeedbackBubble />
           </IonReactRouter>
         </HouseholdProvider>
       </AuthProvider>

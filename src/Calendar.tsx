@@ -24,6 +24,7 @@ import {
   chatbubbleOutline,
   chevronBackOutline,
   chevronForwardOutline,
+  notificationsOutline,
   pencilOutline,
   timeOutline,
   trashOutline,
@@ -31,8 +32,21 @@ import {
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from './api'
 import { useAuth } from './auth'
+import { enablePushNotifications } from './pushNotifications'
 
 type EventCategory = 'home' | 'appointment' | 'reminder' | 'social'
+type ReminderUnit = 'minutes' | 'hours' | 'days'
+
+interface ReminderInput {
+  id: string
+  amount: string
+  unit: ReminderUnit
+}
+
+interface CalendarReminder {
+  id: string
+  minutesBefore: number
+}
 
 interface CalendarEvent {
   id: string
@@ -44,6 +58,7 @@ interface CalendarEvent {
   notes: string
   createdBy: string
   eventNotes: CalendarEventNote[]
+  reminders: CalendarReminder[]
 }
 
 interface CalendarEventNote {
@@ -61,6 +76,10 @@ interface CalendarEventDto {
   end_time?: string | null
   category: EventCategory
   notes?: string | null
+  reminders?: Array<{
+    id: number
+    minutes_before: number
+  }>
   creator?: { name: string } | null
   event_notes?: Array<{
     id: number
@@ -68,6 +87,35 @@ interface CalendarEventDto {
     created_at: string
     author?: { name: string } | null
   }>
+}
+
+function reminderToMinutes(reminder: ReminderInput) {
+  if (reminder.amount.trim() === '') return null
+  const amount = Number(reminder.amount)
+  if (!Number.isFinite(amount) || !Number.isInteger(amount) || amount < 0) return null
+  if (reminder.unit === 'days') return amount * 24 * 60
+  if (reminder.unit === 'hours') return amount * 60
+  return amount
+}
+
+function minutesToReminderInput(minutes: number): ReminderInput {
+  if (minutes >= 1440 && minutes % 1440 === 0) {
+    return { id: crypto.randomUUID(), amount: String(minutes / 1440), unit: 'days' }
+  }
+
+  if (minutes >= 60 && minutes % 60 === 0) {
+    return { id: crypto.randomUUID(), amount: String(minutes / 60), unit: 'hours' }
+  }
+
+  return { id: crypto.randomUUID(), amount: String(minutes), unit: 'minutes' }
+}
+
+function formatReminder(minutes: number) {
+  const input = minutesToReminderInput(minutes)
+  const amount = Number(input.amount)
+  const label = amount === 1 ? input.unit.replace(/s$/, '') : input.unit
+
+  return `${amount} ${label} before`
 }
 
 const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -112,6 +160,9 @@ export function Calendar() {
   const [endTime, setEndTime] = useState('')
   const [category, setCategory] = useState<EventCategory>('home')
   const [notes, setNotes] = useState('')
+  const [reminders, setReminders] = useState<ReminderInput[]>([])
+  const [formMessage, setFormMessage] = useState('')
+  const [pushMessage, setPushMessage] = useState('')
 
   const calendarDays = useMemo(() => {
     const year = displayMonth.getFullYear()
@@ -147,6 +198,10 @@ export function Calendar() {
         endTime: event.end_time?.slice(0, 5) ?? '',
         category: event.category,
         notes: event.notes ?? '',
+        reminders: (event.reminders ?? []).map((reminder) => ({
+          id: String(reminder.id),
+          minutesBefore: reminder.minutes_before,
+        })),
         createdBy: event.creator?.name ?? 'Household member',
         eventNotes: (event.event_notes ?? []).map((note) => ({
           id: String(note.id),
@@ -170,6 +225,9 @@ export function Calendar() {
     setEndTime('')
     setCategory('home')
     setNotes('')
+    setReminders([])
+    setFormMessage('')
+    setPushMessage('')
   }
 
   function openEventForm(date = selectedDate) {
@@ -185,6 +243,9 @@ export function Calendar() {
     setEndTime(event.endTime)
     setCategory(event.category)
     setNotes(event.notes)
+    setReminders(event.reminders.map((reminder) => minutesToReminderInput(reminder.minutesBefore)))
+    setFormMessage('')
+    setPushMessage('')
     setShowEventForm(true)
   }
 
@@ -210,6 +271,24 @@ export function Calendar() {
 
   async function saveEvent(event: FormEvent) {
     event.preventDefault()
+    setFormMessage('')
+
+    const reminderMinutes = reminders
+      .map(reminderToMinutes)
+      .filter((minutes): minutes is number => minutes !== null)
+
+    if (reminderMinutes.length !== reminders.length) {
+      setFormMessage('Reminder amounts must be whole numbers.')
+      return
+    }
+
+    const uniqueReminderMinutes = [...new Set(reminderMinutes)].sort((a, b) => b - a)
+
+    if (uniqueReminderMinutes.length > 0 && !startTime) {
+      setFormMessage('Add a start time so HouseApp knows when to send reminders.')
+      return
+    }
+
     await api(
       editingEventId
         ? `/calendar-events/${editingEventId}`
@@ -223,6 +302,9 @@ export function Calendar() {
         end_time: endTime || null,
         category,
         notes: notes.trim() || null,
+        reminders: uniqueReminderMinutes.map((minutesBefore) => ({
+          minutes_before: minutesBefore,
+        })),
       }),
       },
     )
@@ -250,6 +332,35 @@ export function Calendar() {
     })
     setNewNote('')
     await loadEvents()
+  }
+
+  function addReminder() {
+    setReminders((current) => [
+      ...current,
+      { id: crypto.randomUUID(), amount: '30', unit: 'minutes' },
+    ])
+  }
+
+  function updateReminder(id: string, update: Partial<ReminderInput>) {
+    setReminders((current) =>
+      current.map((reminder) =>
+        reminder.id === id ? { ...reminder, ...update } : reminder,
+      ),
+    )
+  }
+
+  function removeReminder(id: string) {
+    setReminders((current) => current.filter((reminder) => reminder.id !== id))
+  }
+
+  async function enablePushForDevice() {
+    setPushMessage('')
+    try {
+      await enablePushNotifications()
+      setPushMessage('Push notifications are enabled on this device.')
+    } catch (error) {
+      setPushMessage(error instanceof Error ? error.message : 'Push notifications could not be enabled.')
+    }
   }
 
   const noteEvent = events.find((event) => event.id === noteEventId) ?? null
@@ -444,6 +555,14 @@ export function Calendar() {
                           {event.endTime && ` - ${event.endTime}`}
                         </p>
                       )}
+                      {event.reminders.length > 0 && (
+                        <p className="event-reminders">
+                          <IonIcon icon={notificationsOutline} />
+                          {event.reminders
+                            .map((reminder) => formatReminder(reminder.minutesBefore))
+                            .join(', ')}
+                        </p>
+                      )}
                       {event.notes && <p className="event-notes">{event.notes}</p>}
                       <IonNote>Added by {event.createdBy}</IonNote>
                     </article>
@@ -531,6 +650,76 @@ export function Calendar() {
                 value={notes}
                 onIonInput={(event) => setNotes(event.detail.value ?? '')}
               />
+              <section className="event-reminder-form">
+                <div>
+                  <h3>Reminders</h3>
+                  <IonNote>
+                    Add as many reminders as you want before the event. Push
+                    reminders need a start time.
+                  </IonNote>
+                </div>
+                {reminders.map((reminder) => (
+                  <div className="event-reminder-row" key={reminder.id}>
+                    <IonInput
+                      fill="outline"
+                      label="Amount"
+                      labelPlacement="floating"
+                      min="0"
+                      step="1"
+                      type="number"
+                      value={reminder.amount}
+                      onIonInput={(event) =>
+                        updateReminder(reminder.id, {
+                          amount: event.detail.value ?? '',
+                        })
+                      }
+                    />
+                    <IonSelect
+                      fill="outline"
+                      label="Before"
+                      labelPlacement="floating"
+                      value={reminder.unit}
+                      onIonChange={(event) =>
+                        updateReminder(reminder.id, {
+                          unit: event.detail.value as ReminderUnit,
+                        })
+                      }
+                    >
+                      <IonSelectOption value="minutes">Minutes</IonSelectOption>
+                      <IonSelectOption value="hours">Hours</IonSelectOption>
+                      <IonSelectOption value="days">Days</IonSelectOption>
+                    </IonSelect>
+                    <IonButton
+                      fill="clear"
+                      color="medium"
+                      aria-label="Remove reminder"
+                      onClick={() => removeReminder(reminder.id)}
+                    >
+                      <IonIcon slot="icon-only" icon={trashOutline} />
+                    </IonButton>
+                  </div>
+                ))}
+                <div className="event-reminder-actions">
+                  <IonButton fill="outline" type="button" onClick={addReminder}>
+                    <IonIcon slot="start" icon={addOutline} />
+                    Add reminder
+                  </IonButton>
+                  <IonButton
+                    fill="outline"
+                    type="button"
+                    onClick={() => void enablePushForDevice()}
+                  >
+                    <IonIcon slot="start" icon={notificationsOutline} />
+                    Enable push
+                  </IonButton>
+                </div>
+                {pushMessage && <IonNote>{pushMessage}</IonNote>}
+              </section>
+              {formMessage && (
+                <IonText color="danger" className="form-message">
+                  {formMessage}
+                </IonText>
+              )}
               <IonButton type="submit" expand="block">
                 {editingEventId ? 'Save changes' : 'Add to calendar'}
               </IonButton>

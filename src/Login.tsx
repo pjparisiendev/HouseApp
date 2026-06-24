@@ -15,7 +15,7 @@ import { useAuth } from './auth'
 export function Login() {
   const history = useHistory()
   const { login } = useAuth()
-  const [username, setUsername] = useState('pj')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -28,7 +28,7 @@ export function Login() {
       return
     }
     setSubmitting(false)
-    setError('The username or prototype password is incorrect.')
+    setError('The username or password is incorrect.')
   }
 
   return (

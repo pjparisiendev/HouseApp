@@ -10,13 +10,25 @@ import {
 import { api, setApiToken } from './api'
 
 export type Role = 'admin' | 'member' | 'viewer'
-export type Permission = 'manage_users' | 'manage_roles' | 'edit_household'
+export type Permission =
+  | 'manage_users'
+  | 'manage_roles'
+  | 'edit_household'
+  | 'manage_feedback'
+  | 'manage_households'
+
+export interface HouseholdSummary {
+  id: number
+  name: string
+}
 
 export interface HouseholdUser {
   id: number
   name: string
   username: string
   role: Role
+  is_platform_owner: boolean
+  household?: HouseholdSummary | null
 }
 
 const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
@@ -24,6 +36,8 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   member: ['edit_household'],
   viewer: [],
 }
+
+const PLATFORM_PERMISSIONS: Permission[] = ['manage_households', 'manage_feedback']
 
 interface LoginResponse {
   token: string
@@ -38,8 +52,11 @@ interface AuthContextValue {
   logout: () => Promise<void>
   can: (permission: Permission) => boolean
   addUser: (
-    user: Omit<HouseholdUser, 'id'> & { password: string },
+    user: Pick<HouseholdUser, 'name' | 'username' | 'role'> & {
+      password: string
+    },
   ) => Promise<boolean>
+  deleteUser: (userId: number) => Promise<boolean>
   updateUserRole: (userId: number, role: Role) => Promise<boolean>
   updateProfile: (name: string) => Promise<boolean>
   changePassword: (
@@ -102,9 +119,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       },
       can(permission) {
-        return currentUser
-          ? ROLE_PERMISSIONS[currentUser.role].includes(permission)
-          : false
+        if (!currentUser) return false
+        if (
+          currentUser.is_platform_owner &&
+          PLATFORM_PERMISSIONS.includes(permission)
+        ) {
+          return true
+        }
+
+        return ROLE_PERMISSIONS[currentUser.role].includes(permission)
       },
       async addUser(user) {
         try {
@@ -113,6 +136,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             body: JSON.stringify(user),
           })
           setUsers((current) => [...current, created])
+          return true
+        } catch {
+          return false
+        }
+      },
+      async deleteUser(userId) {
+        try {
+          await api(`/users/${userId}`, { method: 'DELETE' })
+          setUsers((current) => current.filter((user) => user.id !== userId))
           return true
         } catch {
           return false

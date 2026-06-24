@@ -32,7 +32,7 @@ class AuthController extends Controller
 
         return response()->json([
             'token' => $user->createToken('houseapp')->plainTextToken,
-            'user' => $user,
+            'user' => $user->load('household:id,name'),
         ]);
     }
 
@@ -45,7 +45,7 @@ class AuthController extends Controller
 
     public function profile(Request $request): User
     {
-        return $request->user();
+        return $request->user()->load('household:id,name');
     }
 
     public function updateProfile(Request $request): User
@@ -53,7 +53,7 @@ class AuthController extends Controller
         $data = $request->validate(['name' => ['required', 'string', 'max:100']]);
         $request->user()->update($data);
 
-        return $request->user()->fresh();
+        return $request->user()->fresh()->load('household:id,name');
     }
 
     public function updatePassword(Request $request): JsonResponse

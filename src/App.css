@@ -455,13 +455,18 @@
   text-transform: uppercase;
 }
 
-.event-time {
+.event-time,
+.event-reminders {
   display: flex;
   align-items: center;
   gap: 6px;
   margin: 0 0 8px;
   font-size: 0.82rem;
   font-weight: 600;
+}
+
+.event-reminders {
+  color: var(--ion-color-primary);
 }
 
 .event-notes {
@@ -531,6 +536,32 @@
   gap: 12px;
   padding-top: 20px;
   border-top: 1px solid var(--ion-color-light-shade);
+}
+
+.event-reminder-form {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--ion-color-light-shade);
+  border-radius: 14px;
+}
+
+.event-reminder-form h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+
+.event-reminder-row {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.8fr) minmax(140px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.event-reminder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .time-fields {
@@ -1151,6 +1182,75 @@ button.compact-item-row {
   margin: 0 -10px -8px 0;
 }
 
+.feedback-layout {
+  display: grid;
+  gap: 20px;
+  width: min(100% - 28px, 1100px);
+  margin: 0 auto;
+  padding: 36px 0 64px;
+}
+
+.feedback-list {
+  display: grid;
+  gap: 12px;
+}
+
+.feedback-card {
+  margin: 0;
+  border: 1px solid var(--ion-color-light-shade);
+  border-radius: 18px;
+  box-shadow: none;
+}
+
+.feedback-card ion-card-content {
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+}
+
+.feedback-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.feedback-card-heading ion-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.feedback-card-heading ion-button {
+  width: 36px;
+  height: 36px;
+  margin: 0;
+}
+
+.feedback-card h2 {
+  margin: 0;
+  color: #000;
+  font-size: 1.1rem;
+}
+
+.feedback-card p {
+  margin: 0;
+  color: var(--ion-color-medium-shade);
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.feedback-bubble {
+  position: fixed;
+  right: max(18px, env(safe-area-inset-right));
+  bottom: max(18px, env(safe-area-inset-bottom));
+  z-index: 1000;
+  width: 52px;
+  height: 52px;
+  --border-radius: 999px;
+  --box-shadow: 0 10px 28px rgba(20, 35, 60, 0.22);
+}
+
 @media (max-width: 960px) {
   .calendar-workspace {
     grid-template-columns: 1fr;
@@ -1251,6 +1351,10 @@ button.compact-item-row {
   }
 
   .time-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .event-reminder-row {
     grid-template-columns: 1fr;
   }
 

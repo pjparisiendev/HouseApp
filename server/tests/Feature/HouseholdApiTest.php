@@ -43,8 +43,9 @@ class HouseholdApiTest extends TestCase
 
     public function test_low_stock_item_is_added_and_removed_from_shopping_after_acquisition(): void
     {
-        Sanctum::actingAs(User::factory()->create(['role' => 'member']));
-        $category = InventoryCategory::query()->create(['name' => 'Fridge']);
+        $member = User::factory()->create(['role' => 'member']);
+        Sanctum::actingAs($member);
+        $category = $this->createCategory($member, 'Fridge');
 
         $inventoryResponse = $this->postJson('/api/inventory-items', [
             'name' => 'Milk',
@@ -72,8 +73,9 @@ class HouseholdApiTest extends TestCase
 
     public function test_acquiring_new_shopping_item_creates_inventory_item(): void
     {
-        Sanctum::actingAs(User::factory()->create(['role' => 'member']));
-        $category = InventoryCategory::query()->create(['name' => 'Pantry']);
+        $member = User::factory()->create(['role' => 'member']);
+        Sanctum::actingAs($member);
+        $category = $this->createCategory($member, 'Pantry');
 
         $shoppingItem = $this->postJson('/api/shopping-items', [
             'name' => 'Rice',
@@ -90,8 +92,9 @@ class HouseholdApiTest extends TestCase
 
     public function test_unit_threshold_adds_and_acquires_a_whole_pack(): void
     {
-        Sanctum::actingAs(User::factory()->create(['role' => 'member']));
-        $category = InventoryCategory::query()->create(['name' => 'Fridge']);
+        $member = User::factory()->create(['role' => 'member']);
+        Sanctum::actingAs($member);
+        $category = $this->createCategory($member, 'Fridge');
 
         $item = $this->postJson('/api/inventory-items', [
             'name' => 'Eggs',
@@ -120,8 +123,9 @@ class HouseholdApiTest extends TestCase
 
     public function test_pack_threshold_rounds_shortage_up_to_enough_packs(): void
     {
-        Sanctum::actingAs(User::factory()->create(['role' => 'member']));
-        $category = InventoryCategory::query()->create(['name' => 'Fridge']);
+        $member = User::factory()->create(['role' => 'member']);
+        Sanctum::actingAs($member);
+        $category = $this->createCategory($member, 'Fridge');
 
         $this->postJson('/api/inventory-items', [
             'name' => 'Eggs',
@@ -145,8 +149,9 @@ class HouseholdApiTest extends TestCase
 
     public function test_exact_pack_threshold_does_not_add_a_shopping_item(): void
     {
-        Sanctum::actingAs(User::factory()->create(['role' => 'member']));
-        $category = InventoryCategory::query()->create(['name' => 'Fridge']);
+        $member = User::factory()->create(['role' => 'member']);
+        Sanctum::actingAs($member);
+        $category = $this->createCategory($member, 'Fridge');
 
         $this->postJson('/api/inventory-items', [
             'name' => 'Eggs',
@@ -165,8 +170,9 @@ class HouseholdApiTest extends TestCase
 
     public function test_manually_added_known_pack_item_is_acquired_as_packs(): void
     {
-        Sanctum::actingAs(User::factory()->create(['role' => 'member']));
-        $category = InventoryCategory::query()->create(['name' => 'Fridge']);
+        $member = User::factory()->create(['role' => 'member']);
+        Sanctum::actingAs($member);
+        $category = $this->createCategory($member, 'Fridge');
 
         $inventoryItem = $this->postJson('/api/inventory-items', [
             'name' => 'Eggs',
@@ -197,9 +203,11 @@ class HouseholdApiTest extends TestCase
     public function test_member_can_manage_an_inventory_gallery(): void
     {
         Storage::fake('local');
-        Sanctum::actingAs(User::factory()->create(['role' => 'member']));
-        $category = InventoryCategory::query()->create(['name' => 'Fridge']);
+        $member = User::factory()->create(['role' => 'member']);
+        Sanctum::actingAs($member);
+        $category = $this->createCategory($member, 'Fridge');
         $item = InventoryItem::query()->create([
+            'household_id' => $member->household_id,
             'name' => 'Eggs',
             'inventory_category_id' => $category->id,
             'quantity' => 12,
@@ -242,9 +250,11 @@ class HouseholdApiTest extends TestCase
     public function test_inventory_gallery_enforces_five_image_limit(): void
     {
         Storage::fake('local');
-        Sanctum::actingAs(User::factory()->create(['role' => 'member']));
-        $category = InventoryCategory::query()->create(['name' => 'Fridge']);
+        $member = User::factory()->create(['role' => 'member']);
+        Sanctum::actingAs($member);
+        $category = $this->createCategory($member, 'Fridge');
         $item = InventoryItem::query()->create([
+            'household_id' => $member->household_id,
             'name' => 'Eggs',
             'inventory_category_id' => $category->id,
             'quantity' => 12,
@@ -267,14 +277,16 @@ class HouseholdApiTest extends TestCase
     public function test_viewer_cannot_modify_inventory_media(): void
     {
         Storage::fake('local');
-        $category = InventoryCategory::query()->create(['name' => 'Fridge']);
+        $viewer = User::factory()->create(['role' => 'viewer']);
+        $category = $this->createCategory($viewer, 'Fridge');
         $item = InventoryItem::query()->create([
+            'household_id' => $viewer->household_id,
             'name' => 'Eggs',
             'inventory_category_id' => $category->id,
             'quantity' => 12,
             'low_stock_threshold' => 0,
         ]);
-        Sanctum::actingAs(User::factory()->create(['role' => 'viewer']));
+        Sanctum::actingAs($viewer);
 
         $this->post("/api/inventory-items/{$item->id}/media", [
             'image' => $this->fakeImage(),
@@ -327,6 +339,7 @@ class HouseholdApiTest extends TestCase
         $member = User::factory()->create(['role' => 'member', 'name' => 'PJ']);
         Sanctum::actingAs($member);
         $event = CalendarEvent::query()->create([
+            'household_id' => $member->household_id,
             'title' => 'Dinner',
             'event_date' => '2026-06-21',
             'category' => 'social',
@@ -358,12 +371,14 @@ class HouseholdApiTest extends TestCase
 
     public function test_viewer_cannot_append_an_event_note(): void
     {
+        $viewer = User::factory()->create(['role' => 'viewer']);
         $event = CalendarEvent::query()->create([
+            'household_id' => $viewer->household_id,
             'title' => 'Appointment',
             'event_date' => '2026-06-21',
             'category' => 'appointment',
         ]);
-        Sanctum::actingAs(User::factory()->create(['role' => 'viewer']));
+        Sanctum::actingAs($viewer);
 
         $this->postJson("/api/calendar-events/{$event->id}/notes", [
             'body' => 'Trying to change the event',
@@ -375,5 +390,13 @@ class HouseholdApiTest extends TestCase
         $contents = base64_decode('UklGRjwAAABXRUJQVlA4IDAAAADwAQCdASoEAAMAAQAcJaACdLoB+AAETAAA/vSj7/7Wh9Wh9Wh/Ld/8lNf4247AAAA=');
 
         return UploadedFile::fake()->createWithContent($name, $contents);
+    }
+
+    private function createCategory(User $user, string $name): InventoryCategory
+    {
+        return InventoryCategory::query()->create([
+            'household_id' => $user->household_id,
+            'name' => $name,
+        ]);
     }
 }

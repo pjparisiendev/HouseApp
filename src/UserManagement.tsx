@@ -6,6 +6,7 @@ import {
   IonCardContent,
   IonContent,
   IonHeader,
+  IonIcon,
   IonInput,
   IonItem,
   IonLabel,
@@ -18,13 +19,14 @@ import {
   IonTitle,
   IonToolbar,
 } from '@ionic/react'
+import { trashOutline } from 'ionicons/icons'
 import { type FormEvent, useState } from 'react'
 import { roleLabels, type Role, useAuth } from './auth'
 
 const roles = Object.keys(roleLabels) as Role[]
 
 export function UserManagement() {
-  const { addUser, currentUser, updateUserRole, users } = useAuth()
+  const { addUser, currentUser, deleteUser, updateUserRole, users } = useAuth()
   const [name, setName] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -50,6 +52,16 @@ export function UserManagement() {
       setPassword('')
       setRole('member')
     }
+  }
+
+  async function handleDeleteUser(userId: number, name: string) {
+    if (!window.confirm(`Delete ${name}? This cannot be undone.`)) return
+
+    setMessage(
+      (await deleteUser(userId))
+        ? `${name} was deleted.`
+        : 'The user could not be deleted.',
+    )
   }
 
   return (
@@ -160,6 +172,17 @@ export function UserManagement() {
                         ))}
                       </IonSelect>
                       {isCurrentUser && <IonNote slot="end">You</IonNote>}
+                      {!isCurrentUser && (
+                        <IonButton
+                          slot="end"
+                          fill="clear"
+                          color="danger"
+                          aria-label={`Delete ${user.name}`}
+                          onClick={() => void handleDeleteUser(user.id, user.name)}
+                        >
+                          <IonIcon icon={trashOutline} />
+                        </IonButton>
+                      )}
                     </IonItem>
                   )
                 })}

@@ -13,7 +13,10 @@ class WishlistItemController extends Controller
 
     public function index()
     {
+        abort_unless(request()->user()->household_id, 403);
+
         return WishlistItem::query()
+            ->where('household_id', request()->user()->household_id)
             ->with('creator:id,name')
             ->orderBy('type')
             ->orderBy('title')
@@ -22,7 +25,10 @@ class WishlistItemController extends Controller
 
     public function store(Request $request)
     {
+        abort_unless($request->user()->household_id, 403);
+
         $data = $this->validateItem($request);
+        $data['household_id'] = $request->user()->household_id;
         $data['created_by'] = $request->user()->id;
 
         return response()->json(
@@ -33,6 +39,8 @@ class WishlistItemController extends Controller
 
     public function update(Request $request, WishlistItem $wishlistItem)
     {
+        $this->authorizeHousehold($request, $wishlistItem);
+
         $wishlistItem->update($this->validateItem($request));
 
         return $wishlistItem->fresh()->load('creator:id,name');
@@ -40,6 +48,8 @@ class WishlistItemController extends Controller
 
     public function destroy(WishlistItem $wishlistItem)
     {
+        abort_unless(request()->user()->household_id === $wishlistItem->household_id, 404);
+
         $wishlistItem->delete();
 
         return response()->noContent();
@@ -53,5 +63,10 @@ class WishlistItemController extends Controller
             'notes' => ['nullable', 'string', 'max:5000'],
             'url' => ['nullable', 'url:http,https', 'max:2048'],
         ]);
+    }
+
+    private function authorizeHousehold(Request $request, WishlistItem $wishlistItem): void
+    {
+        abort_unless($request->user()->household_id === $wishlistItem->household_id, 404);
     }
 }

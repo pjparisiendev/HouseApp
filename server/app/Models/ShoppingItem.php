@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 #[Fillable([
     'inventory_category_id',
     'inventory_item_id',
+    'household_id',
     'name',
     'quantity',
     'automatic',

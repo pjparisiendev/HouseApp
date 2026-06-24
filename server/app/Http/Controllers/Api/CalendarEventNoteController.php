@@ -10,6 +10,8 @@ class CalendarEventNoteController extends Controller
 {
     public function store(Request $request, CalendarEvent $calendarEvent)
     {
+        abort_unless($request->user()->household_id === $calendarEvent->household_id, 404);
+
         $data = $request->validate([
             'body' => ['required', 'string', 'max:5000'],
         ]);

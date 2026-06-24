@@ -1,5 +1,7 @@
 <?php
 
+use App\Console\Commands\GenerateWebPushKeys;
+use App\Console\Commands\SendCalendarReminders;
 use App\Http\Middleware\EnsurePermission;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -13,6 +15,10 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    ->withCommands([
+        GenerateWebPushKeys::class,
+        SendCalendarReminders::class,
+    ])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'permission' => EnsurePermission::class,

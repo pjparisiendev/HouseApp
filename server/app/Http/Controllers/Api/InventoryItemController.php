@@ -18,13 +18,23 @@ class InventoryItemController extends Controller
 
     public function index()
     {
-        return InventoryItem::query()->with(['category', 'media'])->orderBy('name')->get();
+        abort_unless(request()->user()->household_id, 403);
+
+        return InventoryItem::query()
+            ->where('household_id', request()->user()->household_id)
+            ->with(['category', 'media'])
+            ->orderBy('name')
+            ->get();
     }
 
     public function store(Request $request)
     {
+        abort_unless($request->user()->household_id, 403);
+
         $data = $this->validateItem($request, enforceUnique: false);
+        $data['household_id'] = $request->user()->household_id;
         $item = InventoryItem::query()
+            ->where('household_id', $request->user()->household_id)
             ->where('inventory_category_id', $data['inventory_category_id'])
             ->whereRaw('LOWER(name) = ?', [mb_strtolower($data['name'])])
             ->first();
@@ -42,6 +52,8 @@ class InventoryItemController extends Controller
 
     public function update(Request $request, InventoryItem $inventoryItem)
     {
+        $this->authorizeHousehold($request, $inventoryItem);
+
         $inventoryItem->update($this->validateItem($request, $inventoryItem));
         $this->inventoryService->syncLowStock($inventoryItem);
 
@@ -50,6 +62,8 @@ class InventoryItemController extends Controller
 
     public function destroy(InventoryItem $inventoryItem)
     {
+        abort_unless(request()->user()->household_id === $inventoryItem->household_id, 404);
+
         $inventoryItem->shoppingItems()->where('automatic', true)->delete();
         $inventoryItem->shoppingItems()->update(['inventory_item_id' => null]);
         $inventoryItem->delete();
@@ -59,6 +73,8 @@ class InventoryItemController extends Controller
 
     public function uploadMedia(Request $request, InventoryItem $inventoryItem)
     {
+        $this->authorizeHousehold($request, $inventoryItem);
+
         $data = $request->validate([
             'image' => [
                 'required',
@@ -84,20 +100,25 @@ class InventoryItemController extends Controller
         Request $request,
         ?InventoryItem $inventoryItem = null,
         bool $enforceUnique = true,
-    ): array
-    {
+    ): array {
         $enabled = $request->boolean('sub_quantity_enabled');
         $nameRules = ['required', 'string', 'max:100'];
 
         if ($enforceUnique) {
             $nameRules[] = Rule::unique('inventory_items')->where(
-                fn ($query) => $query->where('inventory_category_id', $request->input('inventory_category_id')),
+                fn ($query) => $query
+                    ->where('household_id', $request->user()->household_id)
+                    ->where('inventory_category_id', $request->input('inventory_category_id')),
             )->ignore($inventoryItem);
         }
 
         $data = $request->validate([
             'name' => $nameRules,
-            'inventory_category_id' => ['required', 'exists:inventory_categories,id'],
+            'inventory_category_id' => [
+                'required',
+                Rule::exists('inventory_categories', 'id')
+                    ->where('household_id', $request->user()->household_id),
+            ],
             'quantity' => ['required', 'integer', 'min:0'],
             'low_stock_threshold' => ['required', 'integer', 'min:0'],
             'sub_quantity_enabled' => ['sometimes', 'boolean'],
@@ -122,5 +143,10 @@ class InventoryItemController extends Controller
                 ? ($data['low_stock_threshold_mode'] ?? 'unit')
                 : 'unit',
         ];
+    }
+
+    private function authorizeHousehold(Request $request, InventoryItem $inventoryItem): void
+    {
+        abort_unless($request->user()->household_id === $inventoryItem->household_id, 404);
     }
 }

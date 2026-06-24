@@ -11,6 +11,7 @@ class InventoryService
     public function syncLowStock(InventoryItem $inventoryItem): void
     {
         $shoppingItem = ShoppingItem::query()
+            ->where('household_id', $inventoryItem->household_id)
             ->where('inventory_item_id', $inventoryItem->id)
             ->first();
         $threshold = $inventoryItem->lowStockThresholdInUnits();
@@ -29,6 +30,7 @@ class InventoryService
 
         if ($isLow && ! $shoppingItem) {
             ShoppingItem::query()->create([
+                'household_id' => $inventoryItem->household_id,
                 'inventory_category_id' => $inventoryItem->inventory_category_id,
                 'inventory_item_id' => $inventoryItem->id,
                 'name' => $inventoryItem->name,
@@ -65,6 +67,7 @@ class InventoryService
 
             if (! $inventoryItem) {
                 $inventoryItem = InventoryItem::query()
+                    ->where('household_id', $shoppingItem->household_id)
                     ->where('inventory_category_id', $shoppingItem->inventory_category_id)
                     ->whereRaw('LOWER(name) = ?', [mb_strtolower($shoppingItem->name)])
                     ->lockForUpdate()
@@ -79,6 +82,7 @@ class InventoryService
                 $inventoryItem->refresh();
             } else {
                 $inventoryItem = InventoryItem::query()->create([
+                    'household_id' => $shoppingItem->household_id,
                     'inventory_category_id' => $shoppingItem->inventory_category_id,
                     'name' => $shoppingItem->name,
                     'quantity' => $shoppingItem->quantity * $shoppingItem->units_per_purchase,

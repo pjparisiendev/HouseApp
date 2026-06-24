@@ -26,14 +26,18 @@ export function ImageUploadField({
     setMessage('')
     try {
       const selected = Array.from(files).slice(0, remaining)
-      const processed: ProcessedImage[] = []
-      for (const file of selected) processed.push(await processImage(file))
-      onProcessed(processed)
+      let processedCount = 0
+      for (const file of selected) {
+        onProcessed([await processImage(file)])
+        processedCount += 1
+      }
       if (files.length > remaining) {
         setMessage(`Only ${remaining} more photo${remaining === 1 ? '' : 's'} can be added.`)
+      } else if (processedCount > 1) {
+        setMessage(`${processedCount} photos were optimized and added.`)
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'The image could not be processed.')
+      setMessage(error instanceof Error ? error.message : 'The image could not be processed. No more selected photos were added.')
     } finally {
       setProcessing(false)
     }
@@ -72,7 +76,7 @@ export function ImageUploadField({
       </div>
       <IonNote>
         {remaining > 0
-          ? `${remaining} photo${remaining === 1 ? '' : 's'} remaining. Originals up to 8 MB are optimized before upload.`
+          ? `${remaining} photo${remaining === 1 ? '' : 's'} remaining. Photos are optimized for phone memory before upload.`
           : 'The gallery is full.'}
       </IonNote>
       {message && <IonNote color="danger">{message}</IonNote>}

@@ -1,12 +1,15 @@
 export const IMAGE_PROCESSING_PROFILE = {
   maxInputBytes: 8 * 1024 * 1024,
-  targetBytes: Math.floor(1.5 * 1024 * 1024),
-  maxDimension: 1600,
+  targetBytes: 900 * 1024,
+  maxDimension: 1024,
+  fallbackMaxInputBytes: 2 * 1024 * 1024,
   initialQuality: 0.85,
   minimumQuality: 0.7,
 } as const
 
 const supportedTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
+const memorySafeMessage =
+  'This phone could not process that camera photo. Try taking the photo farther away/lower resolution or choose a smaller image.'
 
 export interface ProcessedImage {
   file: File
@@ -26,6 +29,18 @@ export function calculateImageDimensions(
   return {
     width: Math.max(1, Math.round(width * scale)),
     height: Math.max(1, Math.round(height * scale)),
+  }
+}
+
+export function calculateDecodeDimensions(
+  file: Pick<File, 'size'>,
+  maxDimension = IMAGE_PROCESSING_PROFILE.maxDimension,
+) {
+  if (file.size <= IMAGE_PROCESSING_PROFILE.fallbackMaxInputBytes) return {}
+
+  return {
+    resizeWidth: maxDimension,
+    resizeQuality: 'high' as const,
   }
 }
 
@@ -58,6 +73,7 @@ async function decodeImage(file: File) {
     try {
       const bitmap = await createImageBitmap(file, {
         imageOrientation: 'from-image',
+        ...calculateDecodeDimensions(file),
       })
       return {
         source: bitmap as CanvasImageSource,
@@ -66,14 +82,26 @@ async function decodeImage(file: File) {
         cleanup: () => bitmap.close(),
       }
     } catch {
-      // Fall through to the broadly supported HTML image decoder.
+      if (file.size > IMAGE_PROCESSING_PROFILE.fallbackMaxInputBytes) {
+        throw new Error(memorySafeMessage)
+      }
     }
+  }
+
+  if (file.size > IMAGE_PROCESSING_PROFILE.fallbackMaxInputBytes) {
+    throw new Error(memorySafeMessage)
   }
 
   const url = URL.createObjectURL(file)
   const image = new Image()
-  image.src = url
-  await image.decode()
+  try {
+    image.src = url
+    await image.decode()
+  } catch {
+    URL.revokeObjectURL(url)
+    throw new Error(memorySafeMessage)
+  }
+
   return {
     source: image as CanvasImageSource,
     width: image.naturalWidth,
@@ -124,7 +152,14 @@ export async function encodePreferredImage(
 
 export async function processImage(file: File): Promise<ProcessedImage> {
   validateSourceImage(file)
-  const decoded = await decodeImage(file)
+  let decoded: Awaited<ReturnType<typeof decodeImage>>
+  try {
+    decoded = await decodeImage(file)
+  } catch (error) {
+    if (error instanceof Error && error.message === memorySafeMessage) throw error
+    throw new Error(memorySafeMessage, { cause: error })
+  }
+
   const canvas = document.createElement('canvas')
 
   try {
@@ -143,7 +178,7 @@ export async function processImage(file: File): Promise<ProcessedImage> {
     }
 
     if (!blob || blob.size > IMAGE_PROCESSING_PROFILE.targetBytes) {
-      throw new Error('The image could not be reduced below 1.5 MB.')
+      throw new Error('The image could not be reduced below 900 KB.')
     }
 
     const extension = blob.type === 'image/webp' ? 'webp' : 'jpg'
@@ -161,7 +196,12 @@ export async function processImage(file: File): Promise<ProcessedImage> {
       originalBytes: file.size,
       processedBytes: processedFile.size,
     }
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('900 KB')) throw error
+    throw new Error(memorySafeMessage, { cause: error })
   } finally {
     decoded.cleanup()
+    canvas.width = 0
+    canvas.height = 0
   }
 }

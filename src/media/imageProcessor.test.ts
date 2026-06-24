@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  calculateDecodeDimensions,
   calculateImageDimensions,
   encodePreferredImage,
   IMAGE_PROCESSING_PROFILE,
@@ -9,12 +10,12 @@ import {
 describe('calculateImageDimensions', () => {
   it('scales landscape and portrait images within the maximum dimension', () => {
     expect(calculateImageDimensions(4000, 3000)).toEqual({
-      width: 1600,
-      height: 1200,
+      width: 1024,
+      height: 768,
     })
     expect(calculateImageDimensions(2000, 4000)).toEqual({
-      width: 800,
-      height: 1600,
+      width: 512,
+      height: 1024,
     })
   })
 
@@ -23,6 +24,19 @@ describe('calculateImageDimensions', () => {
       width: 800,
       height: 600,
     })
+  })
+})
+
+describe('calculateDecodeDimensions', () => {
+  it('requests a smaller bitmap for larger source files', () => {
+    expect(calculateDecodeDimensions({ size: 3 * 1024 * 1024 })).toEqual({
+      resizeWidth: 1024,
+      resizeQuality: 'high',
+    })
+  })
+
+  it('does not force resized decode for smaller source files', () => {
+    expect(calculateDecodeDimensions({ size: 1024 * 1024 })).toEqual({})
   })
 })
 

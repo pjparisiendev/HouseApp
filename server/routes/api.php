@@ -3,9 +3,12 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CalendarEventController;
 use App\Http\Controllers\Api\CalendarEventNoteController;
+use App\Http\Controllers\Api\FeedbackItemController;
+use App\Http\Controllers\Api\HouseholdController;
 use App\Http\Controllers\Api\InventoryCategoryController;
 use App\Http\Controllers\Api\InventoryItemController;
 use App\Http\Controllers\Api\MediaController;
+use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Api\ShoppingItemController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\WishlistItemController;
@@ -19,9 +22,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/profile', [AuthController::class, 'updateProfile']);
     Route::put('/profile/password', [AuthController::class, 'updatePassword']);
 
+    Route::get('/push/public-key', [PushSubscriptionController::class, 'publicKey']);
+    Route::post('/push/subscriptions', [PushSubscriptionController::class, 'store']);
+
     Route::get('/users', [UserController::class, 'index'])->middleware('permission:manage_users');
     Route::post('/users', [UserController::class, 'store'])->middleware('permission:manage_users');
     Route::put('/users/{user}', [UserController::class, 'update'])->middleware('permission:manage_roles');
+    Route::delete('/users/{user}', [UserController::class, 'destroy'])->middleware('permission:manage_users');
+
+    Route::get('/households', [HouseholdController::class, 'index'])->middleware('permission:manage_households');
+    Route::post('/households', [HouseholdController::class, 'store'])->middleware('permission:manage_households');
+    Route::delete('/households/{household}', [HouseholdController::class, 'destroy'])->middleware('permission:manage_households');
 
     Route::get('/categories', [InventoryCategoryController::class, 'index']);
     Route::post('/categories', [InventoryCategoryController::class, 'store'])->middleware('permission:edit_household');
@@ -52,4 +63,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/wishlist-items', [WishlistItemController::class, 'store'])->middleware('permission:edit_household');
     Route::put('/wishlist-items/{wishlistItem}', [WishlistItemController::class, 'update'])->middleware('permission:edit_household');
     Route::delete('/wishlist-items/{wishlistItem}', [WishlistItemController::class, 'destroy'])->middleware('permission:edit_household');
+
+    Route::get('/feedback-items', [FeedbackItemController::class, 'index']);
+    Route::post('/feedback-items', [FeedbackItemController::class, 'store']);
+    Route::put('/feedback-items/{feedbackItem}', [FeedbackItemController::class, 'update'])->middleware('permission:manage_feedback');
+    Route::delete('/feedback-items/{feedbackItem}', [FeedbackItemController::class, 'destroy'])->middleware('permission:manage_feedback');
 });

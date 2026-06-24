@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['name', 'created_by'])]
+#[Fillable(['household_id', 'name', 'created_by'])]
 class InventoryCategory extends Model
 {
     public function items()

@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['title', 'event_date', 'start_time', 'end_time', 'category', 'notes', 'created_by'])]
+#[Fillable(['household_id', 'title', 'event_date', 'start_time', 'end_time', 'category', 'notes', 'created_by'])]
 class CalendarEvent extends Model
 {
     protected function casts(): array
@@ -21,5 +21,10 @@ class CalendarEvent extends Model
     public function eventNotes()
     {
         return $this->hasMany(CalendarEventNote::class)->oldest();
+    }
+
+    public function reminders()
+    {
+        return $this->hasMany(CalendarEventReminder::class)->orderByDesc('minutes_before');
     }
 }

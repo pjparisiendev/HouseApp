@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 
 #[Fillable([
     'inventory_category_id',
+    'household_id',
     'name',
     'quantity',
     'low_stock_threshold',

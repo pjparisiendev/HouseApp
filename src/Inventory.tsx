@@ -184,16 +184,16 @@ export function Inventory() {
       setMessage('The item could not be saved.')
       return
     }
-    for (let index = 0; index < pendingImages.length; index += 1) {
-      if (!(await uploadInventoryMedia(saved.id, pendingImages[index]))) {
-        pendingImages.slice(0, index).forEach((image) =>
-          URL.revokeObjectURL(image.previewUrl),
-        )
-        setPendingImages(pendingImages.slice(index))
+    const imagesToUpload = [...pendingImages]
+    for (let index = 0; index < imagesToUpload.length; index += 1) {
+      if (!(await uploadInventoryMedia(saved.id, imagesToUpload[index]))) {
+        setPendingImages(imagesToUpload.slice(index))
         setEditingItemId(saved.id)
         setMessage('The item was saved, but one photo could not be uploaded.')
         return
       }
+      URL.revokeObjectURL(imagesToUpload[index].previewUrl)
+      setPendingImages(imagesToUpload.slice(index + 1))
     }
     resetItemForm()
     setShowItemForm(false)
