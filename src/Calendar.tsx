@@ -35,7 +35,6 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react'
 import { api, ApiError } from './api'
@@ -45,99 +44,35 @@ import { enablePushNotifications } from './pushNotifications'
 type EventCategory = 'home' | 'appointment' | 'reminder' | 'social'
 type ReminderUnit = 'minutes' | 'hours' | 'days'
 
-declare global {
-  interface Window {
-    google?: GoogleMapsNamespace
-    houseappGoogleMapsPromise?: Promise<void>
-  }
-}
-
-interface GoogleMapsNamespace {
-  maps: {
-    Map: new (
-      element: HTMLElement,
-      options: {
-        center: GoogleLatLng
-        zoom: number
-        mapTypeControl?: boolean
-        streetViewControl?: boolean
-        fullscreenControl?: boolean
-      },
-    ) => GoogleMap
-    Marker: new (options: { map: GoogleMap; position: GoogleLatLng }) => void
-    Geocoder: new () => GoogleGeocoder
-    places: {
-      AutocompleteService: new () => GoogleAutocompleteService
-      Autocomplete: new (
-        input: HTMLInputElement,
-        options: { fields: string[]; types?: string[] },
-      ) => GoogleAutocomplete
-      PlacesService: new (element: HTMLElement) => GooglePlacesService
-    }
-  }
-}
-
-interface GoogleLatLng {
+interface PlaceSuggestion {
+  id: string
+  label: string
   lat: number
   lng: number
 }
 
-interface GoogleMap {
-  setCenter: (position: GoogleLatLng) => void
-  setZoom: (zoom: number) => void
+interface PlaceSearchBias {
+  lat: number
+  lon: number
 }
 
-interface GoogleAutocomplete {
-  addListener: (eventName: 'place_changed', callback: () => void) => void
-  getPlace: () => {
-    formatted_address?: string
-    name?: string
-    place_id?: string
-    url?: string
-    geometry?: {
-      location?: {
-        lat: () => number
-        lng: () => number
-      }
-    }
-  }
-}
-
-interface GoogleGeocoder {
-  geocode: (
-    request: { address: string },
-    callback: (results: GoogleGeocodeResult[] | null, status: string) => void,
-  ) => void
-}
-
-interface GoogleGeocodeResult {
-  formatted_address?: string
-  place_id?: string
+interface PhotonFeature {
   geometry?: {
-    location?: {
-      lat: () => number
-      lng: () => number
-    }
+    coordinates?: [number, number]
+  }
+  properties?: {
+    osm_id?: number
+    name?: string
+    street?: string
+    housenumber?: string
+    city?: string
+    state?: string
+    country?: string
   }
 }
 
-interface GoogleAutocompleteService {
-  getPlacePredictions: (
-    request: { input: string },
-    callback: (predictions: GooglePlacePrediction[] | null) => void,
-  ) => void
-}
-
-interface GooglePlacePrediction {
-  description: string
-  place_id: string
-}
-
-interface GooglePlacesService {
-  getDetails: (
-    request: { placeId: string; fields: string[] },
-    callback: (place: ReturnType<GoogleAutocomplete['getPlace']> | null, status: string) => void,
-  ) => void
+interface PhotonResponse {
+  features?: PhotonFeature[]
 }
 
 interface ReminderInput {
@@ -254,8 +189,15 @@ function formatDate(key: string, options: Intl.DateTimeFormatOptions) {
   )
 }
 
-function mapOpenUrl(event: Pick<CalendarEvent, 'locationName' | 'locationUrl'>) {
+function googleMapsOpenUrl(
+  event: Pick<CalendarEvent, 'locationName' | 'locationUrl' | 'locationLat' | 'locationLng'>,
+) {
   if (event.locationUrl.trim()) return event.locationUrl.trim()
+
+  if (event.locationLat !== null && event.locationLng !== null) {
+    return `https://www.google.com/maps/search/?api=1&query=${event.locationLat},${event.locationLng}`
+  }
+
   if (!event.locationName.trim()) return ''
 
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.locationName.trim())}`
@@ -268,67 +210,98 @@ function parseCoordinate(value: number | string | null | undefined) {
   return Number.isFinite(coordinate) ? coordinate : null
 }
 
-function loadGoogleMaps(apiKey: string) {
-  if (window.google?.maps?.places) return Promise.resolve()
-  if (window.houseappGoogleMapsPromise) return window.houseappGoogleMapsPromise
+function photonLabel(feature: PhotonFeature) {
+  const properties = feature.properties ?? {}
+  const street = [properties.housenumber, properties.street]
+    .filter(Boolean)
+    .join(' ')
+  const parts = [
+    properties.name,
+    street,
+    properties.city,
+    properties.state,
+    properties.country,
+  ].filter(Boolean)
 
-  window.houseappGoogleMapsPromise = new Promise((resolve, reject) => {
-    const script = document.createElement('script')
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places`
-    script.async = true
-    script.defer = true
-    script.onload = () => resolve()
-    script.onerror = () => reject(new Error('Google Maps could not be loaded.'))
-    document.head.append(script)
+  return [...new Set(parts)].join(', ')
+}
+
+async function searchPlaces(
+  query: string,
+  limit = 5,
+  bias?: PlaceSearchBias | null,
+): Promise<PlaceSuggestion[]> {
+  const params = new URLSearchParams({
+    q: query,
+    limit: String(limit),
+    lang: 'en',
   })
 
-  return window.houseappGoogleMapsPromise
+  if (bias) {
+    params.set('lat', String(bias.lat))
+    params.set('lon', String(bias.lon))
+  }
+
+  const response = await fetch(`https://photon.komoot.io/api/?${params}`)
+  if (!response.ok) throw new Error('Location search is temporarily unavailable.')
+
+  const data = (await response.json()) as PhotonResponse
+
+  return (data.features ?? [])
+    .map((feature, index) => {
+      const [lng, lat] = feature.geometry?.coordinates ?? []
+      const label = photonLabel(feature)
+
+      if (
+        typeof lat !== 'number' ||
+        typeof lng !== 'number' ||
+        !Number.isFinite(lat) ||
+        !Number.isFinite(lng) ||
+        !label
+      ) {
+        return null
+      }
+
+      return {
+        id: String(feature.properties?.osm_id ?? `${label}-${index}`),
+        label,
+        lat,
+        lng,
+      }
+    })
+    .filter((suggestion): suggestion is PlaceSuggestion => suggestion !== null)
 }
 
 function MiniMap({
-  apiKey,
   location,
 }: {
-  apiKey: string
   location: Pick<CalendarEvent, 'locationLat' | 'locationLng' | 'locationName'>
 }) {
-  const mapRef = useRef<HTMLDivElement | null>(null)
-
-  useEffect(() => {
-    if (!apiKey || !mapRef.current || location.locationLat === null || location.locationLng === null) return
-
-    let cancelled = false
-    void loadGoogleMaps(apiKey).then(() => {
-      if (cancelled || !window.google || !mapRef.current || location.locationLat === null || location.locationLng === null) return
-      const position = { lat: location.locationLat, lng: location.locationLng }
-      const map = new window.google.maps.Map(mapRef.current, {
-        center: position,
-        zoom: 15,
-        mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: false,
-      })
-      new window.google.maps.Marker({ map, position })
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [apiKey, location.locationLat, location.locationLng])
-
-  if (!apiKey || location.locationLat === null || location.locationLng === null) {
-    return <IonNote>Choose an address from Google to show the mini map.</IonNote>
+  if (location.locationLat === null || location.locationLng === null) {
+    return <IonNote>Choose a suggestion to show the mini map.</IonNote>
   }
 
-  return <div ref={mapRef} className="google-mini-map" aria-label={`${location.locationName} map`} />
+  const delta = 0.006
+  const bbox = [
+    location.locationLng - delta,
+    location.locationLat - delta,
+    location.locationLng + delta,
+    location.locationLat + delta,
+  ].join(',')
+  const marker = `${location.locationLat},${location.locationLng}`
+
+  return (
+    <iframe
+      className="osm-mini-map"
+      title={`${location.locationName} map`}
+      src={`https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${marker}`}
+    />
+  )
 }
 
 export function Calendar() {
   const { can } = useAuth()
   const editable = can('edit_household')
-  const placeInputRef = useRef<HTMLInputElement | null>(null)
-  const previewMapRef = useRef<HTMLDivElement | null>(null)
-  const autocompleteReadyRef = useRef(false)
   const initialDate = new Date()
   const [displayMonth, setDisplayMonth] = useState(
     new Date(initialDate.getFullYear(), initialDate.getMonth(), 1),
@@ -353,9 +326,10 @@ export function Calendar() {
   const [reminders, setReminders] = useState<ReminderInput[]>([])
   const [formMessage, setFormMessage] = useState('')
   const [pushMessage, setPushMessage] = useState('')
-  const [googleMapsApiKey, setGoogleMapsApiKey] = useState('')
   const [mapMessage, setMapMessage] = useState('')
-  const [placeSuggestions, setPlaceSuggestions] = useState<GooglePlacePrediction[]>([])
+  const [placeSuggestions, setPlaceSuggestions] = useState<PlaceSuggestion[]>([])
+  const [placeSearchBias, setPlaceSearchBias] = useState<PlaceSearchBias | null>(null)
+  const [placeSearchBiasRequested, setPlaceSearchBiasRequested] = useState(false)
 
   const calendarDays = useMemo(() => {
     const year = displayMonth.getFullYear()
@@ -416,75 +390,31 @@ export function Calendar() {
   }, [loadEvents])
 
   useEffect(() => {
-    api<{ google_maps_api_key?: string | null }>('/config/maps')
-      .then((config) => {
-        const apiKey = config.google_maps_api_key ?? ''
-        setGoogleMapsApiKey(apiKey)
-        if (!apiKey) setMapMessage('Google Maps API key is not configured yet.')
-      })
-      .catch(() => setMapMessage('Google Maps is not configured yet.'))
-  }, [])
-
-  useEffect(() => {
-    autocompleteReadyRef.current = false
-  }, [showEventForm])
-
-  useEffect(() => {
-    if (!showEventForm || !googleMapsApiKey || !placeInputRef.current || autocompleteReadyRef.current) return
-
-    let cancelled = false
-    setMapMessage('')
-
-    void loadGoogleMaps(googleMapsApiKey)
-      .then(() => {
-        if (cancelled || !window.google || !placeInputRef.current) return
-
-        autocompleteReadyRef.current = true
-        const autocomplete = new window.google.maps.places.Autocomplete(placeInputRef.current, {
-          fields: ['formatted_address', 'geometry', 'name', 'place_id', 'url'],
-        })
-        autocomplete.addListener('place_changed', () => {
-          const place = autocomplete.getPlace()
-          const lat = place.geometry?.location?.lat()
-          const lng = place.geometry?.location?.lng()
-
-          setLocationName(place.formatted_address ?? place.name ?? placeInputRef.current?.value ?? '')
-          setLocationUrl(place.url ?? '')
-          setLocationPlaceId(place.place_id ?? '')
-          setLocationLat(typeof lat === 'number' ? lat : null)
-          setLocationLng(typeof lng === 'number' ? lng : null)
-        })
-      })
-      .catch((error) => {
-        setMapMessage(error instanceof Error ? error.message : 'Google Maps could not be loaded.')
-      })
-
-    return () => {
-      cancelled = true
+    if (
+      !showEventForm ||
+      placeSearchBiasRequested ||
+      placeSearchBias ||
+      !navigator.geolocation
+    ) {
+      return
     }
-  }, [googleMapsApiKey, showEventForm])
 
-  useEffect(() => {
-    if (!showEventForm || !googleMapsApiKey || !previewMapRef.current || locationLat === null || locationLng === null) return
-
-    let cancelled = false
-    void loadGoogleMaps(googleMapsApiKey).then(() => {
-      if (cancelled || !window.google || !previewMapRef.current || locationLat === null || locationLng === null) return
-      const position = { lat: locationLat, lng: locationLng }
-      const map = new window.google.maps.Map(previewMapRef.current, {
-        center: position,
-        zoom: 15,
-        mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: false,
-      })
-      new window.google.maps.Marker({ map, position })
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [googleMapsApiKey, locationLat, locationLng, showEventForm])
+    setPlaceSearchBiasRequested(true)
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setPlaceSearchBias({
+          lat: position.coords.latitude,
+          lon: position.coords.longitude,
+        })
+      },
+      () => undefined,
+      {
+        enableHighAccuracy: false,
+        maximumAge: 10 * 60 * 1000,
+        timeout: 5000,
+      },
+    )
+  }, [placeSearchBias, placeSearchBiasRequested, showEventForm])
 
   function resetEventForm(date = selectedDate) {
     setEditingEventId(null)
@@ -582,7 +512,16 @@ export function Calendar() {
           end_time: endTime || null,
           category,
           location_name: locationName.trim() || null,
-          location_url: locationUrl.trim() || null,
+          location_url: locationUrl.trim() || (
+            locationLat !== null && locationLng !== null
+              ? googleMapsOpenUrl({
+                locationName,
+                locationUrl: '',
+                locationLat,
+                locationLng,
+              })
+              : null
+          ),
           location_place_id: locationPlaceId.trim() || null,
           location_lat: locationLat,
           location_lng: locationLng,
@@ -642,67 +581,47 @@ export function Calendar() {
     setReminders((current) => current.filter((reminder) => reminder.id !== id))
   }
 
-  function applyGooglePlace(place: ReturnType<GoogleAutocomplete['getPlace']> | GoogleGeocodeResult, fallbackName: string) {
-    const lat = place.geometry?.location?.lat()
-    const lng = place.geometry?.location?.lng()
-    const placeName = 'name' in place ? place.name : undefined
-
-    setLocationName(place.formatted_address ?? placeName ?? fallbackName)
-    setLocationUrl('url' in place ? (place.url ?? '') : '')
-    setLocationPlaceId(place.place_id ?? '')
-    setLocationLat(typeof lat === 'number' ? lat : null)
-    setLocationLng(typeof lng === 'number' ? lng : null)
+  function applyPlaceSuggestion(suggestion: PlaceSuggestion) {
+    setLocationName(suggestion.label)
+    setLocationUrl(googleMapsOpenUrl({
+      locationName: suggestion.label,
+      locationUrl: '',
+      locationLat: suggestion.lat,
+      locationLng: suggestion.lng,
+    }))
+    setLocationPlaceId(`osm:${suggestion.id}`)
+    setLocationLat(suggestion.lat)
+    setLocationLng(suggestion.lng)
+    setPlaceSuggestions([])
+    setMapMessage('Location pinned.')
   }
 
-  const geocodeLocation = useCallback(async (address: string, showStatus: boolean) => {
-    if (!googleMapsApiKey || !address.trim()) return false
-
-    await loadGoogleMaps(googleMapsApiKey)
-    const google = window.google
-    if (!google) throw new Error('Google Maps could not be loaded.')
-
-    return new Promise<boolean>((resolve) => {
-      const geocoder = new google.maps.Geocoder()
-      geocoder.geocode({ address: address.trim() }, (results, status) => {
-        const result = results?.[0]
-        const lat = result?.geometry?.location?.lat()
-        const lng = result?.geometry?.location?.lng()
-
-        if (!result || status !== 'OK' || typeof lat !== 'number' || typeof lng !== 'number') {
-          if (showStatus) setMapMessage('That address could not be resolved. Try a more specific address.')
-          resolve(false)
-          return
-        }
-
-        applyGooglePlace(result, address.trim())
-        setLocationUrl(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(result.formatted_address ?? address.trim())}`)
-        if (showStatus) setMapMessage('Location pinned.')
-        resolve(true)
-      })
-    })
-  }, [googleMapsApiKey])
-
   useEffect(() => {
-    if (!showEventForm || !googleMapsApiKey || locationPlaceId || locationName.trim().length < 3) {
+    if (!showEventForm || locationPlaceId || locationName.trim().length < 3) {
       setPlaceSuggestions([])
       return
     }
 
     let cancelled = false
     const timer = window.setTimeout(() => {
-      void loadGoogleMaps(googleMapsApiKey)
-        .then(() => {
-          if (cancelled || !window.google) return
-
-          const service = new window.google.maps.places.AutocompleteService()
-          service.getPlacePredictions({ input: locationName.trim() }, (predictions) => {
-            if (!cancelled) setPlaceSuggestions((predictions ?? []).slice(0, 5))
-          })
-
-          void geocodeLocation(locationName, false)
+      searchPlaces(locationName.trim(), 5, placeSearchBias)
+        .then((suggestions) => {
+          if (cancelled) return
+          setPlaceSuggestions(suggestions)
+          const first = suggestions[0]
+          if (first) {
+            setLocationLat(first.lat)
+            setLocationLng(first.lng)
+            setLocationUrl(googleMapsOpenUrl({
+              locationName: first.label,
+              locationUrl: '',
+              locationLat: first.lat,
+              locationLng: first.lng,
+            }))
+          }
         })
         .catch(() => {
-          if (!cancelled) setMapMessage('Google Maps could not be loaded.')
+          if (!cancelled) setMapMessage('Location search is temporarily unavailable.')
         })
     }, 500)
 
@@ -710,37 +629,7 @@ export function Calendar() {
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [geocodeLocation, googleMapsApiKey, locationName, locationPlaceId, showEventForm])
-
-  async function chooseSuggestion(suggestion: GooglePlacePrediction) {
-    setMapMessage('')
-    setPlaceSuggestions([])
-
-    try {
-      await loadGoogleMaps(googleMapsApiKey)
-      if (!window.google) throw new Error('Google Maps could not be loaded.')
-
-      const serviceHost = document.createElement('div')
-      const service = new window.google.maps.places.PlacesService(serviceHost)
-      service.getDetails(
-        {
-          placeId: suggestion.place_id,
-          fields: ['formatted_address', 'geometry', 'name', 'place_id', 'url'],
-        },
-        (place, status) => {
-          if (!place || status !== 'OK') {
-            setMapMessage('That address could not be resolved. Try typing it manually.')
-            return
-          }
-
-          applyGooglePlace(place, suggestion.description)
-          setMapMessage('Location pinned.')
-        },
-      )
-    } catch (error) {
-      setMapMessage(error instanceof Error ? error.message : 'Google Maps could not be loaded.')
-    }
-  }
+  }, [locationName, locationPlaceId, placeSearchBias, showEventForm])
 
   async function enablePushForDevice() {
     setPushMessage('')
@@ -755,20 +644,20 @@ export function Calendar() {
   async function resolveLocation() {
     setMapMessage('')
 
-    if (!googleMapsApiKey) {
-      setMapMessage('Google Maps API key is not configured yet.')
-      return
-    }
-
     if (!locationName.trim()) {
       setMapMessage('Enter an address or place first.')
       return
     }
 
     try {
-      await geocodeLocation(locationName, true)
-    } catch (error) {
-      setMapMessage(error instanceof Error ? error.message : 'Google Maps could not be loaded.')
+      const [suggestion] = await searchPlaces(locationName.trim(), 1, placeSearchBias)
+      if (!suggestion) {
+        setMapMessage('That address could not be resolved. Try a more specific address.')
+        return
+      }
+      applyPlaceSuggestion(suggestion)
+    } catch {
+      setMapMessage('Location search is temporarily unavailable.')
     }
   }
 
@@ -976,13 +865,13 @@ export function Calendar() {
                         <section className="event-location">
                           <p>
                             <IonIcon icon={locationOutline} />
-                            {event.locationName || 'Google Maps location'}
+                            {event.locationName || 'Location'}
                           </p>
-                          <MiniMap apiKey={googleMapsApiKey} location={event} />
+                          <MiniMap location={event} />
                           <IonButton
                             fill="clear"
                             size="small"
-                            href={mapOpenUrl(event)}
+                            href={googleMapsOpenUrl(event)}
                             target="_blank"
                             rel="noreferrer"
                           >
@@ -1069,10 +958,9 @@ export function Calendar() {
                   </IonSelectOption>
                 ))}
               </IonSelect>
-              <label className="google-place-field">
+              <label className="map-place-field">
                 <span>Address or place</span>
                 <input
-                  ref={placeInputRef}
                   type="text"
                   value={locationName}
                   placeholder="Start typing an address or place"
@@ -1082,18 +970,19 @@ export function Calendar() {
                     setLocationLat(null)
                     setLocationLng(null)
                     setLocationUrl('')
+                    setMapMessage('')
                   }}
                 />
               </label>
               {placeSuggestions.length > 0 && (
-                <div className="google-place-suggestions">
+                <div className="map-place-suggestions">
                   {placeSuggestions.map((suggestion) => (
                     <button
-                      key={suggestion.place_id}
+                      key={suggestion.id}
                       type="button"
-                      onClick={() => void chooseSuggestion(suggestion)}
+                      onClick={() => applyPlaceSuggestion(suggestion)}
                     >
-                      {suggestion.description}
+                      {suggestion.label}
                     </button>
                   ))}
                 </div>
@@ -1121,10 +1010,16 @@ export function Calendar() {
                     Map preview
                   </p>
                   {locationLat !== null && locationLng !== null ? (
-                    <div ref={previewMapRef} className="google-mini-map" />
+                    <MiniMap
+                      location={{
+                        locationName,
+                        locationLat,
+                        locationLng,
+                      }}
+                    />
                   ) : (
                     <IonNote>
-                      Choose a Google suggestion to pin this location on the map.
+                      Choose a suggestion to pin this location on the map.
                     </IonNote>
                   )}
                 </section>
