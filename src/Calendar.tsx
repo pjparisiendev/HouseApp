@@ -24,18 +24,81 @@ import {
   chatbubbleOutline,
   chevronBackOutline,
   chevronForwardOutline,
+  locationOutline,
   notificationsOutline,
   pencilOutline,
   timeOutline,
   trashOutline,
 } from 'ionicons/icons'
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { api } from './api'
 import { useAuth } from './auth'
 import { enablePushNotifications } from './pushNotifications'
 
 type EventCategory = 'home' | 'appointment' | 'reminder' | 'social'
 type ReminderUnit = 'minutes' | 'hours' | 'days'
+
+declare global {
+  interface Window {
+    google?: GoogleMapsNamespace
+    houseappGoogleMapsPromise?: Promise<void>
+  }
+}
+
+interface GoogleMapsNamespace {
+  maps: {
+    Map: new (
+      element: HTMLElement,
+      options: {
+        center: GoogleLatLng
+        zoom: number
+        mapTypeControl?: boolean
+        streetViewControl?: boolean
+        fullscreenControl?: boolean
+      },
+    ) => GoogleMap
+    Marker: new (options: { map: GoogleMap; position: GoogleLatLng }) => void
+    places: {
+      Autocomplete: new (
+        input: HTMLInputElement,
+        options: { fields: string[]; types?: string[] },
+      ) => GoogleAutocomplete
+    }
+  }
+}
+
+interface GoogleLatLng {
+  lat: number
+  lng: number
+}
+
+interface GoogleMap {
+  setCenter: (position: GoogleLatLng) => void
+  setZoom: (zoom: number) => void
+}
+
+interface GoogleAutocomplete {
+  addListener: (eventName: 'place_changed', callback: () => void) => void
+  getPlace: () => {
+    formatted_address?: string
+    name?: string
+    place_id?: string
+    url?: string
+    geometry?: {
+      location?: {
+        lat: () => number
+        lng: () => number
+      }
+    }
+  }
+}
 
 interface ReminderInput {
   id: string
@@ -55,6 +118,11 @@ interface CalendarEvent {
   startTime: string
   endTime: string
   category: EventCategory
+  locationName: string
+  locationUrl: string
+  locationPlaceId: string
+  locationLat: number | null
+  locationLng: number | null
   notes: string
   createdBy: string
   eventNotes: CalendarEventNote[]
@@ -75,6 +143,11 @@ interface CalendarEventDto {
   start_time?: string | null
   end_time?: string | null
   category: EventCategory
+  location_name?: string | null
+  location_url?: string | null
+  location_place_id?: string | null
+  location_lat?: number | string | null
+  location_lng?: number | string | null
   notes?: string | null
   reminders?: Array<{
     id: number
@@ -141,9 +214,81 @@ function formatDate(key: string, options: Intl.DateTimeFormatOptions) {
   )
 }
 
+function mapOpenUrl(event: Pick<CalendarEvent, 'locationName' | 'locationUrl'>) {
+  if (event.locationUrl.trim()) return event.locationUrl.trim()
+  if (!event.locationName.trim()) return ''
+
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.locationName.trim())}`
+}
+
+function parseCoordinate(value: number | string | null | undefined) {
+  if (value === null || value === undefined || value === '') return null
+  const coordinate = Number(value)
+
+  return Number.isFinite(coordinate) ? coordinate : null
+}
+
+function loadGoogleMaps(apiKey: string) {
+  if (window.google?.maps?.places) return Promise.resolve()
+  if (window.houseappGoogleMapsPromise) return window.houseappGoogleMapsPromise
+
+  window.houseappGoogleMapsPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script')
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places`
+    script.async = true
+    script.defer = true
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error('Google Maps could not be loaded.'))
+    document.head.append(script)
+  })
+
+  return window.houseappGoogleMapsPromise
+}
+
+function MiniMap({
+  apiKey,
+  location,
+}: {
+  apiKey: string
+  location: Pick<CalendarEvent, 'locationLat' | 'locationLng' | 'locationName'>
+}) {
+  const mapRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!apiKey || !mapRef.current || location.locationLat === null || location.locationLng === null) return
+
+    let cancelled = false
+    void loadGoogleMaps(apiKey).then(() => {
+      if (cancelled || !window.google || !mapRef.current || location.locationLat === null || location.locationLng === null) return
+      const position = { lat: location.locationLat, lng: location.locationLng }
+      const map = new window.google.maps.Map(mapRef.current, {
+        center: position,
+        zoom: 15,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+      })
+      new window.google.maps.Marker({ map, position })
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [apiKey, location.locationLat, location.locationLng])
+
+  if (!apiKey || location.locationLat === null || location.locationLng === null) {
+    return <IonNote>Choose an address from Google to show the mini map.</IonNote>
+  }
+
+  return <div ref={mapRef} className="google-mini-map" aria-label={`${location.locationName} map`} />
+}
+
 export function Calendar() {
   const { can } = useAuth()
   const editable = can('edit_household')
+  const placeInputRef = useRef<HTMLInputElement | null>(null)
+  const previewMapRef = useRef<HTMLDivElement | null>(null)
+  const autocompleteReadyRef = useRef(false)
   const initialDate = new Date()
   const [displayMonth, setDisplayMonth] = useState(
     new Date(initialDate.getFullYear(), initialDate.getMonth(), 1),
@@ -159,10 +304,17 @@ export function Calendar() {
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
   const [category, setCategory] = useState<EventCategory>('home')
+  const [locationName, setLocationName] = useState('')
+  const [locationUrl, setLocationUrl] = useState('')
+  const [locationPlaceId, setLocationPlaceId] = useState('')
+  const [locationLat, setLocationLat] = useState<number | null>(null)
+  const [locationLng, setLocationLng] = useState<number | null>(null)
   const [notes, setNotes] = useState('')
   const [reminders, setReminders] = useState<ReminderInput[]>([])
   const [formMessage, setFormMessage] = useState('')
   const [pushMessage, setPushMessage] = useState('')
+  const [googleMapsApiKey, setGoogleMapsApiKey] = useState('')
+  const [mapMessage, setMapMessage] = useState('')
 
   const calendarDays = useMemo(() => {
     const year = displayMonth.getFullYear()
@@ -197,6 +349,11 @@ export function Calendar() {
         startTime: event.start_time?.slice(0, 5) ?? '',
         endTime: event.end_time?.slice(0, 5) ?? '',
         category: event.category,
+        locationName: event.location_name ?? '',
+        locationUrl: event.location_url ?? '',
+        locationPlaceId: event.location_place_id ?? '',
+        locationLat: parseCoordinate(event.location_lat),
+        locationLng: parseCoordinate(event.location_lng),
         notes: event.notes ?? '',
         reminders: (event.reminders ?? []).map((reminder) => ({
           id: String(reminder.id),
@@ -217,6 +374,77 @@ export function Calendar() {
     void loadEvents()
   }, [loadEvents])
 
+  useEffect(() => {
+    api<{ google_maps_api_key?: string | null }>('/config/maps')
+      .then((config) => {
+        const apiKey = config.google_maps_api_key ?? ''
+        setGoogleMapsApiKey(apiKey)
+        if (!apiKey) setMapMessage('Google Maps API key is not configured yet.')
+      })
+      .catch(() => setMapMessage('Google Maps is not configured yet.'))
+  }, [])
+
+  useEffect(() => {
+    autocompleteReadyRef.current = false
+  }, [showEventForm])
+
+  useEffect(() => {
+    if (!showEventForm || !googleMapsApiKey || !placeInputRef.current || autocompleteReadyRef.current) return
+
+    let cancelled = false
+    setMapMessage('')
+
+    void loadGoogleMaps(googleMapsApiKey)
+      .then(() => {
+        if (cancelled || !window.google || !placeInputRef.current) return
+
+        autocompleteReadyRef.current = true
+        const autocomplete = new window.google.maps.places.Autocomplete(placeInputRef.current, {
+          fields: ['formatted_address', 'geometry', 'name', 'place_id', 'url'],
+        })
+        autocomplete.addListener('place_changed', () => {
+          const place = autocomplete.getPlace()
+          const lat = place.geometry?.location?.lat()
+          const lng = place.geometry?.location?.lng()
+
+          setLocationName(place.formatted_address ?? place.name ?? placeInputRef.current?.value ?? '')
+          setLocationUrl(place.url ?? '')
+          setLocationPlaceId(place.place_id ?? '')
+          setLocationLat(typeof lat === 'number' ? lat : null)
+          setLocationLng(typeof lng === 'number' ? lng : null)
+        })
+      })
+      .catch((error) => {
+        setMapMessage(error instanceof Error ? error.message : 'Google Maps could not be loaded.')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [googleMapsApiKey, showEventForm])
+
+  useEffect(() => {
+    if (!showEventForm || !googleMapsApiKey || !previewMapRef.current || locationLat === null || locationLng === null) return
+
+    let cancelled = false
+    void loadGoogleMaps(googleMapsApiKey).then(() => {
+      if (cancelled || !window.google || !previewMapRef.current || locationLat === null || locationLng === null) return
+      const position = { lat: locationLat, lng: locationLng }
+      const map = new window.google.maps.Map(previewMapRef.current, {
+        center: position,
+        zoom: 15,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+      })
+      new window.google.maps.Marker({ map, position })
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [googleMapsApiKey, locationLat, locationLng, showEventForm])
+
   function resetEventForm(date = selectedDate) {
     setEditingEventId(null)
     setTitle('')
@@ -224,6 +452,11 @@ export function Calendar() {
     setStartTime('')
     setEndTime('')
     setCategory('home')
+    setLocationName('')
+    setLocationUrl('')
+    setLocationPlaceId('')
+    setLocationLat(null)
+    setLocationLng(null)
     setNotes('')
     setReminders([])
     setFormMessage('')
@@ -242,6 +475,11 @@ export function Calendar() {
     setStartTime(event.startTime)
     setEndTime(event.endTime)
     setCategory(event.category)
+    setLocationName(event.locationName)
+    setLocationUrl(event.locationUrl)
+    setLocationPlaceId(event.locationPlaceId)
+    setLocationLat(event.locationLat)
+    setLocationLng(event.locationLng)
     setNotes(event.notes)
     setReminders(event.reminders.map((reminder) => minutesToReminderInput(reminder.minutesBefore)))
     setFormMessage('')
@@ -301,6 +539,11 @@ export function Calendar() {
         start_time: startTime || null,
         end_time: endTime || null,
         category,
+        location_name: locationName.trim() || null,
+        location_url: locationUrl.trim() || null,
+        location_place_id: locationPlaceId.trim() || null,
+        location_lat: locationLat,
+        location_lng: locationLng,
         notes: notes.trim() || null,
         reminders: uniqueReminderMinutes.map((minutesBefore) => ({
           minutes_before: minutesBefore,
@@ -563,6 +806,24 @@ export function Calendar() {
                             .join(', ')}
                         </p>
                       )}
+                      {(event.locationName || event.locationUrl) && (
+                        <section className="event-location">
+                          <p>
+                            <IonIcon icon={locationOutline} />
+                            {event.locationName || 'Google Maps location'}
+                          </p>
+                          <MiniMap apiKey={googleMapsApiKey} location={event} />
+                          <IonButton
+                            fill="clear"
+                            size="small"
+                            href={mapOpenUrl(event)}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Open in Google Maps
+                          </IonButton>
+                        </section>
+                      )}
                       {event.notes && <p className="event-notes">{event.notes}</p>}
                       <IonNote>Added by {event.createdBy}</IonNote>
                     </article>
@@ -642,6 +903,45 @@ export function Calendar() {
                   </IonSelectOption>
                 ))}
               </IonSelect>
+              <label className="google-place-field">
+                <span>Address or place</span>
+                <input
+                  ref={placeInputRef}
+                  type="text"
+                  value={locationName}
+                  placeholder="Start typing an address or place"
+                  onChange={(event) => {
+                    setLocationName(event.target.value)
+                    setLocationPlaceId('')
+                    setLocationLat(null)
+                    setLocationLng(null)
+                  }}
+                />
+              </label>
+              <IonInput
+                fill="outline"
+                label="Google Maps link"
+                labelPlacement="floating"
+                type="url"
+                value={locationUrl}
+                onIonInput={(event) => setLocationUrl(event.detail.value ?? '')}
+              />
+              {(locationName.trim() || locationUrl.trim()) && (
+                <section className="event-location event-location-preview">
+                  <p>
+                    <IonIcon icon={locationOutline} />
+                    Map preview
+                  </p>
+                  {locationLat !== null && locationLng !== null ? (
+                    <div ref={previewMapRef} className="google-mini-map" />
+                  ) : (
+                    <IonNote>
+                      Choose a Google suggestion to pin this location on the map.
+                    </IonNote>
+                  )}
+                </section>
+              )}
+              {mapMessage && <IonNote>{mapMessage}</IonNote>}
               <IonTextarea
                 fill="outline"
                 label="Notes"

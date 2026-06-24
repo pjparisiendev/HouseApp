@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AppConfigController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CalendarEventController;
 use App\Http\Controllers\Api\CalendarEventNoteController;
@@ -21,6 +22,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/profile', [AuthController::class, 'profile']);
     Route::put('/profile', [AuthController::class, 'updateProfile']);
     Route::put('/profile/password', [AuthController::class, 'updatePassword']);
+    Route::get('/config/maps', [AppConfigController::class, 'maps']);
 
     Route::get('/push/public-key', [PushSubscriptionController::class, 'publicKey']);
     Route::post('/push/subscriptions', [PushSubscriptionController::class, 'store']);

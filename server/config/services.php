@@ -41,4 +41,8 @@ return [
         'private_key' => env('WEBPUSH_PRIVATE_KEY'),
     ],
 
+    'google_maps' => [
+        'browser_key' => env('GOOGLE_MAPS_BROWSER_KEY'),
+    ],
+
 ];
