@@ -72,7 +72,7 @@ class CalendarEventController extends Controller
             'end_time' => ['nullable', 'date_format:H:i', 'after_or_equal:start_time'],
             'category' => ['required', Rule::in(['home', 'appointment', 'reminder', 'social'])],
             'location_name' => ['nullable', 'string', 'max:255'],
-            'location_url' => ['nullable', 'url', 'max:1000'],
+            'location_url' => ['nullable', 'string', 'max:1000'],
             'location_place_id' => ['nullable', 'string', 'max:255'],
             'location_lat' => ['nullable', 'numeric', 'between:-90,90'],
             'location_lng' => ['nullable', 'numeric', 'between:-180,180'],

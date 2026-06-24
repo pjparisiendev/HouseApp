@@ -38,7 +38,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { api } from './api'
+import { api, ApiError } from './api'
 import { useAuth } from './auth'
 import { enablePushNotifications } from './pushNotifications'
 
@@ -65,11 +65,14 @@ interface GoogleMapsNamespace {
       },
     ) => GoogleMap
     Marker: new (options: { map: GoogleMap; position: GoogleLatLng }) => void
+    Geocoder: new () => GoogleGeocoder
     places: {
+      AutocompleteService: new () => GoogleAutocompleteService
       Autocomplete: new (
         input: HTMLInputElement,
         options: { fields: string[]; types?: string[] },
       ) => GoogleAutocomplete
+      PlacesService: new (element: HTMLElement) => GooglePlacesService
     }
   }
 }
@@ -98,6 +101,43 @@ interface GoogleAutocomplete {
       }
     }
   }
+}
+
+interface GoogleGeocoder {
+  geocode: (
+    request: { address: string },
+    callback: (results: GoogleGeocodeResult[] | null, status: string) => void,
+  ) => void
+}
+
+interface GoogleGeocodeResult {
+  formatted_address?: string
+  place_id?: string
+  geometry?: {
+    location?: {
+      lat: () => number
+      lng: () => number
+    }
+  }
+}
+
+interface GoogleAutocompleteService {
+  getPlacePredictions: (
+    request: { input: string },
+    callback: (predictions: GooglePlacePrediction[] | null) => void,
+  ) => void
+}
+
+interface GooglePlacePrediction {
+  description: string
+  place_id: string
+}
+
+interface GooglePlacesService {
+  getDetails: (
+    request: { placeId: string; fields: string[] },
+    callback: (place: ReturnType<GoogleAutocomplete['getPlace']> | null, status: string) => void,
+  ) => void
 }
 
 interface ReminderInput {
@@ -315,6 +355,7 @@ export function Calendar() {
   const [pushMessage, setPushMessage] = useState('')
   const [googleMapsApiKey, setGoogleMapsApiKey] = useState('')
   const [mapMessage, setMapMessage] = useState('')
+  const [placeSuggestions, setPlaceSuggestions] = useState<GooglePlacePrediction[]>([])
 
   const calendarDays = useMemo(() => {
     const year = displayMonth.getFullYear()
@@ -527,30 +568,35 @@ export function Calendar() {
       return
     }
 
-    await api(
-      editingEventId
-        ? `/calendar-events/${editingEventId}`
-        : '/calendar-events',
-      {
-      method: editingEventId ? 'PUT' : 'POST',
-      body: JSON.stringify({
-        title: title.trim(),
-        event_date: eventDate,
-        start_time: startTime || null,
-        end_time: endTime || null,
-        category,
-        location_name: locationName.trim() || null,
-        location_url: locationUrl.trim() || null,
-        location_place_id: locationPlaceId.trim() || null,
-        location_lat: locationLat,
-        location_lng: locationLng,
-        notes: notes.trim() || null,
-        reminders: uniqueReminderMinutes.map((minutesBefore) => ({
-          minutes_before: minutesBefore,
-        })),
-      }),
-      },
-    )
+    try {
+      await api(
+        editingEventId
+          ? `/calendar-events/${editingEventId}`
+          : '/calendar-events',
+        {
+        method: editingEventId ? 'PUT' : 'POST',
+        body: JSON.stringify({
+          title: title.trim(),
+          event_date: eventDate,
+          start_time: startTime || null,
+          end_time: endTime || null,
+          category,
+          location_name: locationName.trim() || null,
+          location_url: locationUrl.trim() || null,
+          location_place_id: locationPlaceId.trim() || null,
+          location_lat: locationLat,
+          location_lng: locationLng,
+          notes: notes.trim() || null,
+          reminders: uniqueReminderMinutes.map((minutesBefore) => ({
+            minutes_before: minutesBefore,
+          })),
+        }),
+        },
+      )
+    } catch (error) {
+      setFormMessage(error instanceof ApiError ? error.message : 'The event could not be saved.')
+      return
+    }
     await loadEvents()
     setSelectedDate(eventDate)
     const selected = new Date(`${eventDate}T12:00:00`)
@@ -596,6 +642,106 @@ export function Calendar() {
     setReminders((current) => current.filter((reminder) => reminder.id !== id))
   }
 
+  function applyGooglePlace(place: ReturnType<GoogleAutocomplete['getPlace']> | GoogleGeocodeResult, fallbackName: string) {
+    const lat = place.geometry?.location?.lat()
+    const lng = place.geometry?.location?.lng()
+    const placeName = 'name' in place ? place.name : undefined
+
+    setLocationName(place.formatted_address ?? placeName ?? fallbackName)
+    setLocationUrl('url' in place ? (place.url ?? '') : '')
+    setLocationPlaceId(place.place_id ?? '')
+    setLocationLat(typeof lat === 'number' ? lat : null)
+    setLocationLng(typeof lng === 'number' ? lng : null)
+  }
+
+  const geocodeLocation = useCallback(async (address: string, showStatus: boolean) => {
+    if (!googleMapsApiKey || !address.trim()) return false
+
+    await loadGoogleMaps(googleMapsApiKey)
+    const google = window.google
+    if (!google) throw new Error('Google Maps could not be loaded.')
+
+    return new Promise<boolean>((resolve) => {
+      const geocoder = new google.maps.Geocoder()
+      geocoder.geocode({ address: address.trim() }, (results, status) => {
+        const result = results?.[0]
+        const lat = result?.geometry?.location?.lat()
+        const lng = result?.geometry?.location?.lng()
+
+        if (!result || status !== 'OK' || typeof lat !== 'number' || typeof lng !== 'number') {
+          if (showStatus) setMapMessage('That address could not be resolved. Try a more specific address.')
+          resolve(false)
+          return
+        }
+
+        applyGooglePlace(result, address.trim())
+        setLocationUrl(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(result.formatted_address ?? address.trim())}`)
+        if (showStatus) setMapMessage('Location pinned.')
+        resolve(true)
+      })
+    })
+  }, [googleMapsApiKey])
+
+  useEffect(() => {
+    if (!showEventForm || !googleMapsApiKey || locationPlaceId || locationName.trim().length < 3) {
+      setPlaceSuggestions([])
+      return
+    }
+
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      void loadGoogleMaps(googleMapsApiKey)
+        .then(() => {
+          if (cancelled || !window.google) return
+
+          const service = new window.google.maps.places.AutocompleteService()
+          service.getPlacePredictions({ input: locationName.trim() }, (predictions) => {
+            if (!cancelled) setPlaceSuggestions((predictions ?? []).slice(0, 5))
+          })
+
+          void geocodeLocation(locationName, false)
+        })
+        .catch(() => {
+          if (!cancelled) setMapMessage('Google Maps could not be loaded.')
+        })
+    }, 500)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [geocodeLocation, googleMapsApiKey, locationName, locationPlaceId, showEventForm])
+
+  async function chooseSuggestion(suggestion: GooglePlacePrediction) {
+    setMapMessage('')
+    setPlaceSuggestions([])
+
+    try {
+      await loadGoogleMaps(googleMapsApiKey)
+      if (!window.google) throw new Error('Google Maps could not be loaded.')
+
+      const serviceHost = document.createElement('div')
+      const service = new window.google.maps.places.PlacesService(serviceHost)
+      service.getDetails(
+        {
+          placeId: suggestion.place_id,
+          fields: ['formatted_address', 'geometry', 'name', 'place_id', 'url'],
+        },
+        (place, status) => {
+          if (!place || status !== 'OK') {
+            setMapMessage('That address could not be resolved. Try typing it manually.')
+            return
+          }
+
+          applyGooglePlace(place, suggestion.description)
+          setMapMessage('Location pinned.')
+        },
+      )
+    } catch (error) {
+      setMapMessage(error instanceof Error ? error.message : 'Google Maps could not be loaded.')
+    }
+  }
+
   async function enablePushForDevice() {
     setPushMessage('')
     try {
@@ -603,6 +749,26 @@ export function Calendar() {
       setPushMessage('Push notifications are enabled on this device.')
     } catch (error) {
       setPushMessage(error instanceof Error ? error.message : 'Push notifications could not be enabled.')
+    }
+  }
+
+  async function resolveLocation() {
+    setMapMessage('')
+
+    if (!googleMapsApiKey) {
+      setMapMessage('Google Maps API key is not configured yet.')
+      return
+    }
+
+    if (!locationName.trim()) {
+      setMapMessage('Enter an address or place first.')
+      return
+    }
+
+    try {
+      await geocodeLocation(locationName, true)
+    } catch (error) {
+      setMapMessage(error instanceof Error ? error.message : 'Google Maps could not be loaded.')
     }
   }
 
@@ -915,9 +1081,31 @@ export function Calendar() {
                     setLocationPlaceId('')
                     setLocationLat(null)
                     setLocationLng(null)
+                    setLocationUrl('')
                   }}
                 />
               </label>
+              {placeSuggestions.length > 0 && (
+                <div className="google-place-suggestions">
+                  {placeSuggestions.map((suggestion) => (
+                    <button
+                      key={suggestion.place_id}
+                      type="button"
+                      onClick={() => void chooseSuggestion(suggestion)}
+                    >
+                      {suggestion.description}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <IonButton
+                fill="outline"
+                type="button"
+                onClick={() => void resolveLocation()}
+              >
+                <IonIcon slot="start" icon={locationOutline} />
+                Resolve address
+              </IonButton>
               <IonInput
                 fill="outline"
                 label="Google Maps link"
