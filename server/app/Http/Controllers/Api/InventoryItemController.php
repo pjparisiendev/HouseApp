@@ -120,6 +120,7 @@ class InventoryItemController extends Controller
                     ->where('household_id', $request->user()->household_id),
             ],
             'quantity' => ['required', 'integer', 'min:0'],
+            'price' => ['nullable', 'numeric', 'min:0', 'max:99999999.99'],
             'low_stock_threshold' => ['required', 'integer', 'min:0'],
             'sub_quantity_enabled' => ['sometimes', 'boolean'],
             'units_per_pack' => $enabled

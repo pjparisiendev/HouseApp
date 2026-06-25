@@ -25,6 +25,7 @@ import {
   bugOutline,
   checkmarkCircleOutline,
   constructOutline,
+  downloadOutline,
   flagOutline,
   pencilOutline,
   trashOutline,
@@ -77,6 +78,12 @@ const emptyForm = {
   description: '',
   status: 'new' as FeedbackStatus,
   priority: 'normal' as FeedbackPriority,
+}
+
+function csvValue(value: string | number | null | undefined) {
+  const text = value === null || value === undefined ? '' : String(value)
+
+  return `"${text.replaceAll('"', '""')}"`
 }
 
 export function Feedback() {
@@ -179,6 +186,43 @@ export function Feedback() {
       .label
   }
 
+  function exportCsv() {
+    const rows = visibleItems.map((item) => [
+      item.id,
+      item.type,
+      item.title,
+      item.description,
+      item.status,
+      item.priority,
+      item.source_label ?? '',
+      item.source_path ?? '',
+      item.creator?.name ?? '',
+      item.created_at,
+    ])
+    const header = [
+      'ID',
+      'Type',
+      'Title',
+      'Description',
+      'Status',
+      'Priority',
+      'Source label',
+      'Source path',
+      'Creator',
+      'Created at',
+    ]
+    const csv = [header, ...rows]
+      .map((row) => row.map(csvValue).join(','))
+      .join('\r\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `houseapp-feedback-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <IonPage>
       <IonHeader>
@@ -192,6 +236,12 @@ export function Feedback() {
               <IonIcon slot="start" icon={addOutline} />
               Add feedback
             </IonButton>
+            {canManage && (
+              <IonButton onClick={exportCsv}>
+                <IonIcon slot="start" icon={downloadOutline} />
+                Export CSV
+              </IonButton>
+            )}
           </IonButtons>
         </IonToolbar>
       </IonHeader>

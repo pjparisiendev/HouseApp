@@ -29,6 +29,7 @@ import {
   gridOutline,
   listOutline,
   pencilOutline,
+  pricetagOutline,
   removeOutline,
   trashOutline,
 } from 'ionicons/icons'
@@ -54,6 +55,7 @@ export function Inventory() {
     inventoryItems,
     setPrimaryMedia,
     setInventoryQuantity,
+    shoppingItems,
     updateInventoryItem,
     uploadInventoryMedia,
   } = useHousehold()
@@ -67,6 +69,7 @@ export function Inventory() {
   const [itemName, setItemName] = useState('')
   const [itemCategory, setItemCategory] = useState('')
   const [quantity, setQuantity] = useState(1)
+  const [price, setPrice] = useState('')
   const [lowStockThreshold, setLowStockThreshold] = useState(0)
   const [subQuantityEnabled, setSubQuantityEnabled] = useState(false)
   const [unitsPerPack, setUnitsPerPack] = useState(12)
@@ -78,6 +81,7 @@ export function Inventory() {
   const [message, setMessage] = useState('')
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([])
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null)
+  const [priceItemId, setPriceItemId] = useState<string | null>(null)
 
   const editingItem = inventoryItems.find((item) => item.id === editingItemId)
   const noneCategory = categories.find((category) => category.name === 'None')
@@ -92,6 +96,24 @@ export function Inventory() {
         .sort((a, b) => a.name.localeCompare(b.name)),
     [activeCategory, inventoryItems],
   )
+
+  const inventoryTotal = useMemo(
+    () =>
+      inventoryItems.reduce(
+        (total, item) => total + (item.price ?? 0) * item.quantity,
+        0,
+      ),
+    [inventoryItems],
+  )
+  const shoppingTotal = useMemo(
+    () =>
+      shoppingItems.reduce(
+        (total, item) => total + (item.price ?? 0) * item.quantity,
+        0,
+      ),
+    [shoppingItems],
+  )
+  const combinedTotal = inventoryTotal + shoppingTotal
 
   async function createCategory(event: FormEvent) {
     event.preventDefault()
@@ -111,12 +133,21 @@ export function Inventory() {
     return Number(item.quantity)
   }
 
+  function money(value: number | null) {
+    return value === null ? 'No price set' : `$${value.toFixed(2)}`
+  }
+
+  function priceValue() {
+    return price.trim() === '' ? null : Number(price)
+  }
+
   function resetItemForm() {
     pendingImages.forEach((image) => URL.revokeObjectURL(image.previewUrl))
     setEditingItemId(null)
     setItemName('')
     setItemCategory(noneCategory?.id ?? '')
     setQuantity(1)
+    setPrice('')
     setLowStockThreshold(0)
     setSubQuantityEnabled(false)
     setUnitsPerPack(12)
@@ -140,6 +171,7 @@ export function Inventory() {
     setItemName(item.name)
     setItemCategory(item.categoryId)
     setQuantity(item.quantity)
+    setPrice(item.price === null ? '' : String(item.price))
     setLowStockThreshold(item.lowStockThreshold)
     setSubQuantityEnabled(item.subQuantityEnabled)
     setUnitsPerPack(item.unitsPerPack)
@@ -162,6 +194,7 @@ export function Inventory() {
           name: itemName,
           categoryId: itemCategory,
           quantity,
+          price: priceValue(),
           lowStockThreshold,
           subQuantityEnabled,
           unitsPerPack,
@@ -173,6 +206,7 @@ export function Inventory() {
           name: itemName,
           categoryId: itemCategory,
           quantity,
+          price: priceValue(),
           lowStockThreshold,
           subQuantityEnabled,
           unitsPerPack,
@@ -264,7 +298,12 @@ export function Inventory() {
                 Adjust quantities as supplies are used or replenished.
               </IonText>
             </div>
-            {!editable && <IonBadge color="medium">Read only</IonBadge>}
+            <div className="stock-heading-badges">
+              <IonBadge color="success">
+                Everything total: ${combinedTotal.toFixed(2)}
+              </IonBadge>
+              {!editable && <IonBadge color="medium">Read only</IonBadge>}
+            </div>
           </section>
 
           <div className="category-bar" aria-label="Inventory categories">
@@ -406,8 +445,29 @@ export function Inventory() {
                               <IonIcon slot="icon-only" icon={pencilOutline} />
                             </IonButton>
                           )}
+                          <IonButton
+                            className="price-button"
+                            fill="clear"
+                            size="small"
+                            aria-label={`Show ${item.name} price`}
+                            onClick={() =>
+                              setPriceItemId(priceItemId === item.id ? null : item.id)
+                            }
+                          >
+                            <IonIcon slot="start" icon={pricetagOutline} />
+                            Price
+                          </IonButton>
                         </div>
                       </div>
+                      {priceItemId === item.id && (
+                        <section className="item-price-section">
+                          <IonIcon icon={pricetagOutline} />
+                          <div>
+                            <strong>{money(item.price)}</strong>
+                            <IonNote>Estimated price for this inventory item.</IonNote>
+                          </div>
+                        </section>
+                      )}
                       {expandedItemId === item.id && (
                         <div className="stock-image-view">
                           <ImageGallery
@@ -722,6 +782,16 @@ export function Inventory() {
                     setQuantity(Number(event.detail.value))
                   }
                   required
+                />
+                <IonInput
+                  fill="outline"
+                  label="Price"
+                  labelPlacement="floating"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={price}
+                  onIonInput={(event) => setPrice(event.detail.value ?? '')}
                 />
                 <IonInput
                   fill="outline"

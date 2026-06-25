@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
     'household_id',
     'name',
     'quantity',
+    'price',
     'low_stock_threshold',
     'sub_quantity_enabled',
     'units_per_pack',

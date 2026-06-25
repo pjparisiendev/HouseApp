@@ -674,6 +674,26 @@
   align-items: end;
   justify-content: space-between;
   gap: 20px;
+  min-width: 0;
+}
+
+.stock-heading > div:first-child {
+  min-width: 0;
+}
+
+.stock-heading-badges {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.stock-heading-badges ion-badge {
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
 }
 
 .stock-heading h1 {
@@ -847,8 +867,31 @@ button.compact-item-row {
   margin: 0;
 }
 
-.stock-card-actions ion-button.view-image-button {
+.stock-card-actions ion-button.view-image-button,
+.stock-card-actions ion-button.price-button {
   width: auto;
+}
+
+.item-price-section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+  padding: 12px;
+  border: 1px solid var(--ion-color-light-shade);
+  border-radius: 14px;
+  background: var(--ion-color-light);
+}
+
+.item-price-section ion-icon {
+  color: var(--ion-color-primary);
+  font-size: 1.3rem;
+}
+
+.item-price-section strong {
+  display: block;
+  color: #000;
+  font-size: 1.05rem;
 }
 
 .stock-image-view {
@@ -1451,6 +1494,12 @@ button.compact-item-row {
 
   .stock-heading {
     align-items: start;
+    flex-direction: column;
+  }
+
+  .stock-heading-badges {
+    justify-content: flex-start;
+    width: 100%;
   }
 
   .stock-grid {

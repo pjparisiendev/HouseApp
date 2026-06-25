@@ -35,6 +35,7 @@ class InventoryService
                 'inventory_item_id' => $inventoryItem->id,
                 'name' => $inventoryItem->name,
                 'quantity' => $purchaseQuantity,
+                'price' => $inventoryItem->price,
                 'automatic' => true,
                 'purchase_unit' => $purchaseUnit,
                 'units_per_purchase' => $unitsPerPurchase,
@@ -49,6 +50,7 @@ class InventoryService
                 'inventory_category_id' => $inventoryItem->inventory_category_id,
                 'name' => $inventoryItem->name,
                 'quantity' => $purchaseQuantity,
+                'price' => $inventoryItem->price,
                 'purchase_unit' => $purchaseUnit,
                 'units_per_purchase' => $unitsPerPurchase,
                 'purchase_label' => $purchaseLabel,
@@ -79,6 +81,9 @@ class InventoryService
                     'quantity',
                     $shoppingItem->quantity * $shoppingItem->units_per_purchase,
                 );
+                if ($shoppingItem->price !== null) {
+                    $inventoryItem->update(['price' => $shoppingItem->price]);
+                }
                 $inventoryItem->refresh();
             } else {
                 $inventoryItem = InventoryItem::query()->create([
@@ -86,7 +91,21 @@ class InventoryService
                     'inventory_category_id' => $shoppingItem->inventory_category_id,
                     'name' => $shoppingItem->name,
                     'quantity' => $shoppingItem->quantity * $shoppingItem->units_per_purchase,
-                    'low_stock_threshold' => 0,
+                    'price' => $shoppingItem->price,
+                    'low_stock_threshold' => $shoppingItem->pending_low_stock_threshold,
+                    'sub_quantity_enabled' => $shoppingItem->pending_sub_quantity_enabled,
+                    'units_per_pack' => $shoppingItem->pending_sub_quantity_enabled
+                        ? $shoppingItem->pending_units_per_pack
+                        : 1,
+                    'unit_label' => $shoppingItem->pending_sub_quantity_enabled
+                        ? $shoppingItem->pending_unit_label
+                        : null,
+                    'pack_label' => $shoppingItem->pending_sub_quantity_enabled
+                        ? $shoppingItem->pending_pack_label
+                        : null,
+                    'low_stock_threshold_mode' => $shoppingItem->pending_sub_quantity_enabled
+                        ? $shoppingItem->pending_low_stock_threshold_mode
+                        : 'unit',
                 ]);
             }
 

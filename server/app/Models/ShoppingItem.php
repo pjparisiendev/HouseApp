@@ -11,16 +11,26 @@ use Illuminate\Database\Eloquent\Model;
     'household_id',
     'name',
     'quantity',
+    'price',
     'automatic',
     'purchase_unit',
     'units_per_purchase',
     'purchase_label',
+    'pending_low_stock_threshold',
+    'pending_sub_quantity_enabled',
+    'pending_units_per_pack',
+    'pending_unit_label',
+    'pending_pack_label',
+    'pending_low_stock_threshold_mode',
 ])]
 class ShoppingItem extends Model
 {
     protected function casts(): array
     {
-        return ['automatic' => 'boolean'];
+        return [
+            'automatic' => 'boolean',
+            'pending_sub_quantity_enabled' => 'boolean',
+        ];
     }
 
     public function category()

@@ -29,6 +29,7 @@ export interface InventoryItem {
   name: string
   categoryId: string
   quantity: number
+  price: number | null
   lowStockThreshold: number
   subQuantityEnabled: boolean
   unitsPerPack: number
@@ -43,11 +44,18 @@ export interface ShoppingItem {
   name: string
   categoryId: string
   quantity: number
+  price: number | null
   inventoryItemId?: string
   automatic: boolean
   purchaseUnit: 'unit' | 'pack'
   unitsPerPurchase: number
   purchaseLabel: string
+  pendingLowStockThreshold: number
+  pendingSubQuantityEnabled: boolean
+  pendingUnitsPerPack: number
+  pendingUnitLabel: string
+  pendingPackLabel: string
+  pendingLowStockThresholdMode: 'unit' | 'pack'
 }
 
 interface CategoryDto {
@@ -60,6 +68,7 @@ interface InventoryItemDto {
   name: string
   inventory_category_id: number
   quantity: number
+  price?: number | string | null
   low_stock_threshold: number
   sub_quantity_enabled: boolean
   units_per_pack: number
@@ -75,10 +84,17 @@ interface ShoppingItemDto {
   inventory_category_id: number
   inventory_item_id?: number | null
   quantity: number
+  price?: number | string | null
   automatic: boolean
   purchase_unit: 'unit' | 'pack'
   units_per_purchase: number
   purchase_label?: string | null
+  pending_low_stock_threshold: number
+  pending_sub_quantity_enabled: boolean
+  pending_units_per_pack: number
+  pending_unit_label?: string | null
+  pending_pack_label?: string | null
+  pending_low_stock_threshold_mode: 'unit' | 'pack'
 }
 
 function mapCategory(category: CategoryDto): InventoryCategory {
@@ -91,6 +107,7 @@ function mapInventoryItem(item: InventoryItemDto): InventoryItem {
     name: item.name,
     categoryId: String(item.inventory_category_id),
     quantity: Number(item.quantity),
+    price: item.price === null || item.price === undefined ? null : Number(item.price),
     lowStockThreshold: Number(item.low_stock_threshold),
     subQuantityEnabled: item.sub_quantity_enabled,
     unitsPerPack: Number(item.units_per_pack),
@@ -107,6 +124,7 @@ function mapShoppingItem(item: ShoppingItemDto): ShoppingItem {
     name: item.name,
     categoryId: String(item.inventory_category_id),
     quantity: Number(item.quantity),
+    price: item.price === null || item.price === undefined ? null : Number(item.price),
     inventoryItemId: item.inventory_item_id
       ? String(item.inventory_item_id)
       : undefined,
@@ -114,6 +132,12 @@ function mapShoppingItem(item: ShoppingItemDto): ShoppingItem {
     purchaseUnit: item.purchase_unit,
     unitsPerPurchase: Number(item.units_per_purchase),
     purchaseLabel: item.purchase_label ?? '',
+    pendingLowStockThreshold: Number(item.pending_low_stock_threshold),
+    pendingSubQuantityEnabled: item.pending_sub_quantity_enabled,
+    pendingUnitsPerPack: Number(item.pending_units_per_pack),
+    pendingUnitLabel: item.pending_unit_label ?? '',
+    pendingPackLabel: item.pending_pack_label ?? '',
+    pendingLowStockThresholdMode: item.pending_low_stock_threshold_mode,
   }
 }
 
@@ -130,7 +154,10 @@ interface HouseholdContextValue {
   setPrimaryMedia: (mediaId: string) => Promise<void>
   setInventoryQuantity: (itemId: string, quantity: number) => Promise<void>
   addShoppingItem: (
-    item: Pick<ShoppingItem, 'name' | 'categoryId' | 'quantity'>,
+    item: Pick<ShoppingItem, 'name' | 'categoryId' | 'quantity' | 'price'> & Partial<Pick<ShoppingItem, 'pendingLowStockThreshold' | 'pendingSubQuantityEnabled' | 'pendingUnitsPerPack' | 'pendingUnitLabel' | 'pendingPackLabel' | 'pendingLowStockThresholdMode'>>,
+  ) => Promise<boolean>
+  updateShoppingItem: (
+    item: Pick<ShoppingItem, 'id' | 'name' | 'categoryId' | 'quantity' | 'price'> & Partial<Pick<ShoppingItem, 'pendingLowStockThreshold' | 'pendingSubQuantityEnabled' | 'pendingUnitsPerPack' | 'pendingUnitLabel' | 'pendingPackLabel' | 'pendingLowStockThresholdMode'>>,
   ) => Promise<boolean>
   setShoppingQuantity: (itemId: string, quantity: number) => Promise<void>
   removeShoppingItem: (itemId: string) => Promise<void>
@@ -186,6 +213,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
           name: item.name,
           inventory_category_id: item.categoryId,
           quantity: item.quantity,
+          price: item.price,
           low_stock_threshold: item.lowStockThreshold,
           sub_quantity_enabled: item.subQuantityEnabled,
           units_per_pack: item.unitsPerPack,
@@ -209,6 +237,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
           name: item.name,
           inventory_category_id: item.categoryId,
           quantity: item.quantity,
+          price: item.price,
           low_stock_threshold: item.lowStockThreshold,
           sub_quantity_enabled: item.subQuantityEnabled,
           units_per_pack: item.unitsPerPack,
@@ -256,7 +285,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   }
 
   async function addShoppingItem(
-    item: Pick<ShoppingItem, 'name' | 'categoryId' | 'quantity'>,
+    item: Pick<ShoppingItem, 'name' | 'categoryId' | 'quantity' | 'price'> & Partial<Pick<ShoppingItem, 'pendingLowStockThreshold' | 'pendingSubQuantityEnabled' | 'pendingUnitsPerPack' | 'pendingUnitLabel' | 'pendingPackLabel' | 'pendingLowStockThresholdMode'>>,
   ) {
     try {
       await api('/shopping-items', {
@@ -265,6 +294,39 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
           name: item.name,
           inventory_category_id: item.categoryId,
           quantity: item.quantity,
+          price: item.price ?? null,
+          low_stock_threshold: item.pendingLowStockThreshold ?? 0,
+          sub_quantity_enabled: item.pendingSubQuantityEnabled ?? false,
+          units_per_pack: item.pendingUnitsPerPack ?? 1,
+          unit_label: item.pendingUnitLabel ?? '',
+          pack_label: item.pendingPackLabel ?? '',
+          low_stock_threshold_mode: item.pendingLowStockThresholdMode ?? 'unit',
+        }),
+      })
+      await refreshHousehold()
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  async function updateShoppingItem(
+    item: Pick<ShoppingItem, 'id' | 'name' | 'categoryId' | 'quantity' | 'price'> & Partial<Pick<ShoppingItem, 'pendingLowStockThreshold' | 'pendingSubQuantityEnabled' | 'pendingUnitsPerPack' | 'pendingUnitLabel' | 'pendingPackLabel' | 'pendingLowStockThresholdMode'>>,
+  ) {
+    try {
+      await api(`/shopping-items/${item.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          name: item.name,
+          inventory_category_id: item.categoryId,
+          quantity: item.quantity,
+          price: item.price ?? null,
+          low_stock_threshold: item.pendingLowStockThreshold ?? 0,
+          sub_quantity_enabled: item.pendingSubQuantityEnabled ?? false,
+          units_per_pack: item.pendingUnitsPerPack ?? 1,
+          unit_label: item.pendingUnitLabel ?? '',
+          pack_label: item.pendingPackLabel ?? '',
+          low_stock_threshold_mode: item.pendingLowStockThresholdMode ?? 'unit',
         }),
       })
       await refreshHousehold()
@@ -307,6 +369,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
         setPrimaryMedia,
         setInventoryQuantity,
         addShoppingItem,
+        updateShoppingItem,
         setShoppingQuantity,
         removeShoppingItem,
         acquireShoppingItem,

@@ -24,6 +24,8 @@ import {
   checkmarkOutline,
   gridOutline,
   listOutline,
+  pencilOutline,
+  pricetagOutline,
   removeOutline,
   trashOutline,
 } from 'ionicons/icons'
@@ -41,24 +43,37 @@ export function ShoppingList() {
     removeShoppingItem,
     setShoppingQuantity,
     shoppingItems,
+    updateShoppingItem,
   } = useHousehold()
   const editable = can('edit_household')
   const [activeCategory, setActiveCategory] = useState('all')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [showItemForm, setShowItemForm] = useState(false)
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [quantity, setQuantity] = useState(1)
+  const [price, setPrice] = useState('')
+  const [lowStockThreshold, setLowStockThreshold] = useState(0)
+  const [subQuantityEnabled, setSubQuantityEnabled] = useState(false)
+  const [unitLabel, setUnitLabel] = useState('')
+  const [packLabel, setPackLabel] = useState('')
+  const [unitsPerPack, setUnitsPerPack] = useState(1)
+  const [lowStockThresholdMode, setLowStockThresholdMode] = useState<'unit' | 'pack'>('unit')
+  const [formMessage, setFormMessage] = useState('')
+  const [priceItemId, setPriceItemId] = useState<string | null>(null)
   const noneCategory = categories.find((category) => category.name === 'None')
 
   const matchedInventoryItem = useMemo(
     () =>
       inventoryItems.find(
         (item) =>
-          item.categoryId === categoryId &&
-          item.name.toLocaleLowerCase() === name.trim().toLocaleLowerCase(),
+          (editingItemId &&
+            item.id === shoppingItems.find((shoppingItem) => shoppingItem.id === editingItemId)?.inventoryItemId) ||
+          (item.categoryId === categoryId &&
+            item.name.toLocaleLowerCase() === name.trim().toLocaleLowerCase()),
       ),
-    [categoryId, inventoryItems, name],
+    [categoryId, editingItemId, inventoryItems, name, shoppingItems],
   )
 
   const visibleItems = useMemo(
@@ -72,23 +87,107 @@ export function ShoppingList() {
     [activeCategory, shoppingItems],
   )
 
+  const estimatedTotal = useMemo(
+    () =>
+      shoppingItems.reduce(
+        (total, item) => total + (item.price ?? 0) * item.quantity,
+        0,
+      ),
+    [shoppingItems],
+  )
+  const inventoryTotal = useMemo(
+    () =>
+      inventoryItems.reduce(
+        (total, item) => total + (item.price ?? 0) * item.quantity,
+        0,
+      ),
+    [inventoryItems],
+  )
+  const combinedTotal = inventoryTotal + estimatedTotal
+
+  function money(value: number | null) {
+    return value === null ? 'No price set' : `$${value.toFixed(2)}`
+  }
+
+  function priceValue() {
+    return price.trim() === '' ? null : Number(price)
+  }
+
   async function createItem(event: FormEvent) {
     event.preventDefault()
     if (!categoryId) return
-    if (await addShoppingItem({ name, categoryId, quantity })) {
-      setName('')
-      setCategoryId(noneCategory?.id ?? '')
-      setQuantity(1)
+    setFormMessage('')
+
+    const payload = {
+      name,
+      categoryId,
+      quantity,
+      price: priceValue(),
+      pendingLowStockThreshold: lowStockThreshold,
+      pendingSubQuantityEnabled: subQuantityEnabled,
+      pendingUnitsPerPack: unitsPerPack,
+      pendingUnitLabel: unitLabel,
+      pendingPackLabel: packLabel,
+      pendingLowStockThresholdMode: lowStockThresholdMode,
+    }
+    const saved = editingItemId
+      ? await updateShoppingItem({ id: editingItemId, ...payload })
+      : await addShoppingItem(payload)
+
+    if (saved) {
+      resetForm()
       setShowItemForm(false)
+    } else {
+      setFormMessage('The shopping item could not be saved.')
     }
   }
 
-  function openNewItemForm() {
+  function resetForm() {
+    setEditingItemId(null)
     setName('')
+    setCategoryId(noneCategory?.id ?? '')
+    setQuantity(1)
+    setPrice('')
+    setLowStockThreshold(0)
+    setSubQuantityEnabled(false)
+    setUnitLabel('')
+    setPackLabel('')
+    setUnitsPerPack(1)
+    setLowStockThresholdMode('unit')
+    setFormMessage('')
+  }
+
+  function openNewItemForm() {
+    resetForm()
     setCategoryId(
       activeCategory !== 'all' ? activeCategory : (noneCategory?.id ?? ''),
     )
-    setQuantity(1)
+    setShowItemForm(true)
+  }
+
+  function openEditItemForm(item: (typeof shoppingItems)[number]) {
+    const inventoryItem = inventoryItems.find(
+      (candidate) => candidate.id === item.inventoryItemId,
+    )
+
+    setEditingItemId(item.id)
+    setName(item.name)
+    setCategoryId(item.categoryId)
+    setQuantity(item.quantity)
+    setPrice(item.price === null ? '' : String(item.price))
+    setLowStockThreshold(
+      inventoryItem?.lowStockThreshold ?? item.pendingLowStockThreshold,
+    )
+    setSubQuantityEnabled(
+      inventoryItem?.subQuantityEnabled ?? item.pendingSubQuantityEnabled,
+    )
+    setUnitLabel(inventoryItem?.unitLabel ?? item.pendingUnitLabel)
+    setPackLabel(inventoryItem?.packLabel ?? item.pendingPackLabel)
+    setUnitsPerPack(inventoryItem?.unitsPerPack ?? item.pendingUnitsPerPack)
+    setLowStockThresholdMode(
+      inventoryItem?.lowStockThresholdMode ?? item.pendingLowStockThresholdMode,
+    )
+    setFormMessage('')
     setShowItemForm(true)
   }
 
@@ -131,9 +230,17 @@ export function ShoppingList() {
                 add it back into inventory.
               </IonText>
             </div>
-            <IonBadge color="primary">
-              {shoppingItems.length} {shoppingItems.length === 1 ? 'item' : 'items'}
-            </IonBadge>
+            <div className="stock-heading-badges">
+              <IonBadge color="primary">
+                {shoppingItems.length} {shoppingItems.length === 1 ? 'item' : 'items'}
+              </IonBadge>
+              <IonBadge color="success">
+                Estimated total: ${estimatedTotal.toFixed(2)}
+              </IonBadge>
+              <IonBadge color="success">
+                Everything total: ${combinedTotal.toFixed(2)}
+              </IonBadge>
+            </div>
           </section>
 
           <div className="category-bar" aria-label="Shopping categories">
@@ -192,6 +299,15 @@ export function ShoppingList() {
                 <div className="compact-item-row" key={item.id}>
                   <span>{item.name}</span>
                   <strong>{quantityLabel(item)}</strong>
+                  {editable && (
+                    <IonButton
+                      fill="clear"
+                      aria-label={`Edit ${item.name}`}
+                      onClick={() => openEditItemForm(item)}
+                    >
+                      <IonIcon slot="icon-only" icon={pencilOutline} />
+                    </IonButton>
+                  )}
                 </div>
               ))}
             </section>
@@ -214,6 +330,26 @@ export function ShoppingList() {
                           </div>
                           <h2>{item.name}</h2>
                         </div>
+                        {editable && (
+                          <IonButton
+                            fill="clear"
+                            aria-label={`Edit ${item.name}`}
+                            onClick={() => openEditItemForm(item)}
+                          >
+                            <IonIcon slot="icon-only" icon={pencilOutline} />
+                          </IonButton>
+                        )}
+                        <IonButton
+                          fill="clear"
+                          size="small"
+                          aria-label={`Show ${item.name} price`}
+                          onClick={() =>
+                            setPriceItemId(priceItemId === item.id ? null : item.id)
+                          }
+                        >
+                          <IonIcon slot="start" icon={pricetagOutline} />
+                          Price
+                        </IonButton>
                         <div className="shopping-quantity-block">
                           <div className="quantity-control compact">
                             <IonButton
@@ -251,12 +387,24 @@ export function ShoppingList() {
                             </IonButton>
                           </div>
                           <IonNote>
-                            {item.quantity} ×{' '}
+                            {item.quantity} x{' '}
                             {item.purchaseLabel ||
                               (item.purchaseUnit === 'pack' ? 'pack' : 'unit')}
                           </IonNote>
                         </div>
                       </div>
+                      {priceItemId === item.id && (
+                        <section className="item-price-section">
+                          <IonIcon icon={pricetagOutline} />
+                          <div>
+                            <strong>{money(item.price)}</strong>
+                            <IonNote>
+                              Estimated line total: $
+                              {((item.price ?? 0) * item.quantity).toFixed(2)}
+                            </IonNote>
+                          </div>
+                        </section>
+                      )}
                       {editable && (
                         <div className="shopping-actions">
                           <IonButton
@@ -286,7 +434,10 @@ export function ShoppingList() {
 
         <IonModal
           isOpen={showItemForm}
-          onDidDismiss={() => setShowItemForm(false)}
+          onDidDismiss={() => {
+            setShowItemForm(false)
+            resetForm()
+          }}
         >
           <IonHeader>
             <IonToolbar>
@@ -295,7 +446,7 @@ export function ShoppingList() {
                   Cancel
                 </IonButton>
               </IonButtons>
-              <IonTitle>New shopping item</IonTitle>
+              <IonTitle>{editingItemId ? 'Edit shopping item' : 'New shopping item'}</IonTitle>
             </IonToolbar>
           </IonHeader>
           <IonContent>
@@ -338,13 +489,95 @@ export function ShoppingList() {
                 }
                 required
               />
+              <IonInput
+                fill="outline"
+                label="Price"
+                labelPlacement="floating"
+                type="number"
+                min="0"
+                step="0.01"
+                value={price}
+                onIonInput={(event) => setPrice(event.detail.value ?? '')}
+              />
+              <IonInput
+                fill="outline"
+                label="Low-stock limit"
+                labelPlacement="floating"
+                type="number"
+                min="0"
+                value={lowStockThreshold}
+                onIonInput={(event) =>
+                  setLowStockThreshold(Number(event.detail.value ?? 0))
+                }
+              />
+              <div className="pack-toggle">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={subQuantityEnabled}
+                    onChange={(event) => {
+                      setSubQuantityEnabled(event.target.checked)
+                      if (!event.target.checked) setLowStockThresholdMode('unit')
+                    }}
+                  />
+                  Enable pack quantities
+                </label>
+                <IonNote>
+                  Use this for items bought as packs but tracked as units.
+                </IonNote>
+              </div>
+              {subQuantityEnabled && (
+                <div className="pack-fields">
+                  <IonInput
+                    fill="outline"
+                    label="Unit label"
+                    labelPlacement="floating"
+                    value={unitLabel}
+                    onIonInput={(event) => setUnitLabel(event.detail.value ?? '')}
+                    required
+                  />
+                  <IonInput
+                    fill="outline"
+                    label="Pack label"
+                    labelPlacement="floating"
+                    value={packLabel}
+                    onIonInput={(event) => setPackLabel(event.detail.value ?? '')}
+                    required
+                  />
+                  <IonInput
+                    fill="outline"
+                    label="Units per pack"
+                    labelPlacement="floating"
+                    type="number"
+                    min="2"
+                    value={unitsPerPack}
+                    onIonInput={(event) =>
+                      setUnitsPerPack(Number(event.detail.value ?? 1))
+                    }
+                    required
+                  />
+                  <IonSelect
+                    fill="outline"
+                    label="Low-stock limit is in"
+                    labelPlacement="floating"
+                    value={lowStockThresholdMode}
+                    onIonChange={(event) =>
+                      setLowStockThresholdMode(event.detail.value)
+                    }
+                  >
+                    <IonSelectOption value="unit">Individual units</IonSelectOption>
+                    <IonSelectOption value="pack">Whole packs</IonSelectOption>
+                  </IonSelect>
+                </div>
+              )}
               <IonNote>
                 {matchedInventoryItem?.subQuantityEnabled
                   ? `Each ${matchedInventoryItem.packLabel} adds ${matchedInventoryItem.unitsPerPack} ${matchedInventoryItem.unitLabel} to inventory.`
                   : 'If this item is new, confirming it as acquired will create it in inventory automatically.'}
               </IonNote>
+              {formMessage && <IonNote color="danger">{formMessage}</IonNote>}
               <IonButton type="submit" expand="block">
-                Add to shopping list
+                {editingItemId ? 'Save shopping item' : 'Add to shopping list'}
               </IonButton>
             </form>
           </IonContent>
